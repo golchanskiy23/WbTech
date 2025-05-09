@@ -1,0 +1,17 @@
+app:
+  Name : "WBTech0"
+  Version : "1.0.0"
+  
+db:
+  Name : "postgres"
+  Host : "localhost"
+  Port : "5432"
+  Schema : "public"
+  MaxPoolSize : 10
+  
+server:
+  ShutdownTimeout : 5
+  Addr : "3333"
+
+nats:
+  URL : "localhost:4222"

@@ -1,0 +1,27 @@
+services:
+  database:
+    #restart:
+    #  always
+    image:
+      postgres:17
+    environment:
+      - POSTGRES_DB=wbtechdb
+      - POSTGRES_USERNAME=${POSTRGES_UNSAFE_USERNAME}
+      - POSTGRES_PASSWORD=${POSTRGES_UNSAFE_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./volumes/pgdata:/var/lib/postgresql/data
+
+  nats:
+    env_file:
+      - .env
+    image:
+      nats-streaming:latest
+    ports:
+      - "4222:4222"
+    command:
+      ["-p","4222","-cluster_id", "${CLUSTER_ID}"]
+    #restart:
+    #  always
+

@@ -28,12 +28,15 @@ type HttpServer struct {
 type DB struct {
 	Name        string `mapstructure:"name"`
 	Host        string `mapstructure:"host"`
-	Port        string `mapstructure:"port"`
+	Port        int    `mapstructure:"port"`
+	SSLMode     Mode   `mapstructure:"SSLMode"`
 	Schema      string `mapstructure:"schema"`
 	MaxPoolSize int    `mapstructure:"max_pool_size"`
 	user        string `mapstructure:"user"`
 	password    string `mapstructure:"password"`
 }
+
+type Mode string
 
 type NATS struct {
 	URL string `mapstructure:"url"`

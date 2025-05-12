@@ -5,9 +5,11 @@ import (
 	"log"
 )
 
-func SystemVarsInit() {
+func SystemVarsInit() error {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
+		return err
 	}
+	return nil
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"Level0/config"
 	"Level0/internal/app"
+	"log"
 )
 
 // Подумать над миграциями
@@ -13,7 +14,11 @@ import (
 // config for app - ?
 
 func main() {
-	config.SystemVarsInit()
+	err := config.SystemVarsInit()
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
 	cfg, err := config.NewConfig()
 	if err != nil {
 		// какой-то обработчик ошибок

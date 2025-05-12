@@ -2,11 +2,9 @@ package main
 
 import (
 	"Level0/config"
-	"Level0/internal/entity"
 	"Level0/internal/utils"
 	"encoding/json"
 	"fmt"
-	"github.com/joho/godotenv"
 	"github.com/nats-io/stan.go"
 	"log"
 	"math/rand"
@@ -19,40 +17,21 @@ const (
 	MaxTime = 5000 * time.Millisecond
 )
 
-func init() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-}
-
-// не хардкодить .json файл
-func getGivenOrder() entity.Order {
-	file, err := os.Open("model.json")
-	if err != nil {
-		log.Fatal(err)
-		return entity.Order{}
-	}
-	var order entity.Order
-	err = json.NewDecoder(file).Decode(&order)
-	if err != nil {
-		log.Fatal(err)
-		return entity.Order{}
-	}
-	return order
-}
-
 // PUBLISHER, основная "труба"
 // подумать над генерацией идентификаторов клиентов и имён кластеров в NATS и их хранением
 // пока что в .env
 func main() {
-	config.SystemVarsInit()
+	err := config.SystemVarsInit()
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
 	sc, err := stan.Connect(os.Getenv("CLUSTER_ID"), os.Getenv("CLIENT_ID"), stan.NatsURL("nats://localhost:4222"))
 	if err != nil {
 		log.Fatal(fmt.Sprintf("%v", err))
 	}
 	// получаем ссылку на последний заказ из  model.json
-	lastOrder := getGivenOrder()
+	lastOrder := utils.GetGivenOrder()
 
 	// не хардкодить канал
 	channel := "subject"

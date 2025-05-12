@@ -26,8 +26,5 @@ func main() {
 		// какой-то обработчик ошибок
 		return
 	}
-	// запуск самой программы: предварительная инициализация,
-	// запуск прослушки сообщений через каналы(get data , interrupting server)
-	// shutdown server
 	app.RunApp(cfg)
 }

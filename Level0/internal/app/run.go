@@ -2,56 +2,42 @@ package app
 
 import (
 	"Level0/config"
+	"Level0/internal/repository/database"
+	"Level0/internal/repository/natsstreaming"
+	"Level0/pkg/nats"
+	"Level0/pkg/postgres"
 	"context"
-	"database/sql"
 	"fmt"
 	_ "github.com/lib/pq"
-	"github.com/nats-io/stan.go"
 	"log"
-	"net/http"
-	"os"
-	"os/signal"
 )
 
 func RunApp(cfg *config.Config) {
-	// используем элементы из кофигурации
-	// driver_name, name, password, host, port, db, ssl_mode
-	dsn := fmt.Sprintf("%s://%s:%s@%s:%d/%s?sslmode=%s", "postgres",
-		os.Getenv("POSTRGES_UNSAFE_USERNAME"),
-		os.Getenv("POSTRGES_UNSAFE_PASSWORD"),
-		cfg.Database.Host,
-		cfg.Database.Port,
-		cfg.Database.Name,
-		cfg.Database.SSLMode,
-	)
-	// некастомная установка соединения
-	db, err := sql.Open("postgres", dsn)
+	fmt.Printf("Config for database: %v\n", cfg.Database)
+	db, err := postgres.NewStorage(postgres.GetConnection(&cfg.Database), postgres.SetMaxPoolSize(cfg.Database.MaxPoolSize))
+	err = db.Pool.Ping(context.Background())
 	if err != nil {
-		fmt.Println("1")
-		log.Fatalf("Failed to open DB: %v", err)
+		//поменять ошибку
+		log.Fatal(err)
 	}
-	err = db.Ping()
-	if err != nil {
-		fmt.Println("2")
-		fmt.Println(err)
-	}
+	fmt.Printf("Connected to database: %v", db)
+	defer db.Close()
 
-	// инициализируем postgres (каким способом - ?)(возможно потребуется более тонкая настройка)
-	// аналогичная инициализация для nats
-	nats, err := stan.Connect(os.Getenv("CLUSTER_ID"), os.Getenv("SECOND_CLIENT_ID"), stan.NatsURL(cfg.NatsStreaming.URL))
+	natsSrc, err := nats.NewNatsSource(&cfg.NatsStreaming)
 	if err != nil {
-		fmt.Println("3")
-		fmt.Println(err)
-		return
+		log.Fatal(err)
 	}
+	fmt.Printf("Connected to nats source: %v", natsSrc)
+	defer natsSrc.Close()
 
-	//  хранилища данных
-	pgStorage := CreatNewPgStorage(db)
-	cacheStorage := CreateNewCacheStorage(pgStorage)
-	natsStorage := CreateNewNatsStorage(nats)
+	pgRepository := database.CreateNewDBRepository(db)
+	natsRepository := natsstreaming.CreateNewNatsStreamingRepository(natsSrc)
+	fmt.Printf("DataSources created: %v %v\n", natsRepository, pgRepository)
+	/*cacheStorage := CreateNewCacheStorage(pgStorage)
+	 */
 
 	// использует все хранилища( скорее всего будет какая-то инициализация)
-	natsService := CreateNewService(pgStorage, cacheStorage, natsStorage)
+	/*natsService := CreateNewService(pgStorage, cacheStorage, natsStorage)
 	// подписка на канал
 	// channel, queue_group(для единовременной отправки или получения сообщений)
 	err = natsService.StartNatsService()
@@ -79,10 +65,11 @@ func RunApp(cfg *config.Config) {
 	}
 
 	// context - (?)
-	err = server.Shutdown(context.Background())
+	err = server.Shutdown_()
 	if err != nil {
 		log.Fatal("Server shutdown failure")
 	}
 
 	log.Println("Server shutdown complete")
+	*/
 }

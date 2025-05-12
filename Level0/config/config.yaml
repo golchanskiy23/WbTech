@@ -9,6 +9,7 @@ database:
   SSLMode : "disable"
   Schema : "public"
   MaxPoolSize : 10
+
   
 server:
   ShutdownTimeout : 5

@@ -31,7 +31,7 @@ type DB struct {
 	Port        int    `mapstructure:"port"`
 	SSLMode     Mode   `mapstructure:"SSLMode"`
 	Schema      string `mapstructure:"schema"`
-	MaxPoolSize int    `mapstructure:"max_pool_size"`
+	MaxPoolSize int    `mapstructure:"MaxPoolSize"`
 	user        string `mapstructure:"user"`
 	password    string `mapstructure:"password"`
 }

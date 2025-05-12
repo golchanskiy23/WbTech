@@ -2,15 +2,20 @@ package main
 
 import (
 	"Level0/internal/entity"
+	"Level0/internal/utils"
 	"encoding/json"
 	"fmt"
 	"github.com/joho/godotenv"
-	stan "github.com/nats-io/stan.go"
+	"github.com/nats-io/stan.go"
 	"log"
 	"math/rand"
 	"os"
-	"strconv"
 	"time"
+)
+
+const (
+	MinTime = 10 * time.Millisecond
+	MaxTime = 5000 * time.Millisecond
 )
 
 func init() {
@@ -20,8 +25,20 @@ func init() {
 	}
 }
 
-func getGivenOrder() *entity.Order {
-	return &entity.Order{}
+// не хардкодить .json файл
+func getGivenOrder() entity.Order {
+	file, err := os.Open("model.json")
+	if err != nil {
+		log.Fatal(err)
+		return entity.Order{}
+	}
+	var order entity.Order
+	err = json.NewDecoder(file).Decode(&order)
+	if err != nil {
+		log.Fatal(err)
+		return entity.Order{}
+	}
+	return order
 }
 
 // PUBLISHER, основная "труба"
@@ -34,15 +51,11 @@ func main() {
 	}
 	// получаем ссылку на последний заказ из  model.json
 	lastOrder := getGivenOrder()
+
+	// не хардкодить канал
 	channel := "subject"
-	id := lastOrder.UUID
-	// публикуем заказ в канал спустя промежутки времени
+	// подумать над использованием контекста
 	for counter := 1; ; counter++ {
-		// подумать над случайным заполнением полей заказа
-		// currentOrder := CreateNewOrder()
-		lastOrder.UUID = id + strconv.Itoa(counter)
-		lastOrder.Transaction = lastOrder.UUID
-		lastOrder.Items[0] = lastOrder.Items[0] + rand.Int()
 		marshalled, err := json.Marshal(lastOrder)
 		if err != nil {
 			log.Fatal(err)
@@ -53,7 +66,15 @@ func main() {
 			log.Fatal(err)
 			return
 		}
+		lastOrder = utils.RandomOrder()
 		fmt.Printf("Published Order: %s on channel %s\n", marshalled, channel)
-		time.Sleep(5 * time.Second)
+		jitter := func(min, max time.Duration) time.Duration {
+			if min >= max {
+				return min
+			}
+			delta := max - min
+			return min + time.Duration(rand.Int63n(int64(delta)))
+		}(MinTime, MaxTime)
+		time.Sleep(jitter)
 	}
 }

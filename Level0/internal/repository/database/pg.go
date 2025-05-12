@@ -1,6 +1,10 @@
 package database
 
-import "Level0/pkg/postgres"
+import (
+	"Level0/internal/entity"
+	"Level0/pkg/postgres"
+	"context"
+)
 
 type DatabaseRepository struct {
 	DB *postgres.DatabaseSource
@@ -12,3 +16,6 @@ func CreateNewDBRepository(db *postgres.DatabaseSource) *DatabaseRepository {
 }
 
 // набор методов, реализующих работу с базами данных
+func (r *DatabaseRepository) GetAllOrders(ctx context.Context) ([]entity.Order, error) {
+	return nil, nil
+}

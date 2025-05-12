@@ -21,7 +21,7 @@ type DatabaseSource struct {
 
 const (
 	defaultMaxPoolSize       = 5
-	defaultMaxConnLifetime   = 15 * time.Second
+	defaultMaxConnLifetime   = 600 * time.Second
 	defaultMaxConnectTimeout = 1 * time.Second
 	defaultMaxConnAttempts   = 5
 )
@@ -39,11 +39,8 @@ func GetConnection(cfg *config.DB) string {
 	return dsn
 }
 
-func (s *DatabaseSource) Close() error {
-	if err := s.Close(); err != nil {
-		return err
-	}
-	return nil
+func (s *DatabaseSource) Close() {
+	s.Pool.Close()
 }
 
 func NewStorage(url string, options ...Option) (*DatabaseSource, error) {

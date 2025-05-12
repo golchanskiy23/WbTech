@@ -1,6 +1,7 @@
 package main
 
 import (
+	"Level0/config"
 	"Level0/internal/entity"
 	"Level0/internal/utils"
 	"encoding/json"
@@ -45,6 +46,7 @@ func getGivenOrder() entity.Order {
 // подумать над генерацией идентификаторов клиентов и имён кластеров в NATS и их хранением
 // пока что в .env
 func main() {
+	config.SystemVarsInit()
 	sc, err := stan.Connect(os.Getenv("CLUSTER_ID"), os.Getenv("CLIENT_ID"), stan.NatsURL("nats://localhost:4222"))
 	if err != nil {
 		log.Fatal(fmt.Sprintf("%v", err))
@@ -61,6 +63,9 @@ func main() {
 			log.Fatal(err)
 			return
 		}
+		// пока что записываем заказы перед Publish, а не в Subscriber-е
+		// причём без многопоточности
+
 		err = sc.Publish(channel, marshalled)
 		if err != nil {
 			log.Fatal(err)

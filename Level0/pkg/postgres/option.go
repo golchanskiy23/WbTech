@@ -1,9 +1,9 @@
 package postgres
 
-type Option func(*Source)
+type Option func(source *DatabaseSource)
 
 func SetMaxPoolSize(size int) Option {
-	return func(s *Source) {
+	return func(s *DatabaseSource) {
 		s.MaxPoolSize = size
 	}
 }

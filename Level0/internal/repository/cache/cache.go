@@ -24,9 +24,13 @@ func CreateNewCacheRepository(pg *DBRepo.DatabaseRepository) (*CacheRepository, 
 		return nil, err
 	}
 	for _, order := range orders {
-		cacheRepository.Mtx.Lock()
-		cacheRepository.Cache[order.OrderUID] = &order
-		cacheRepository.Mtx.Unlock()
+		cacheRepository.Set(&order)
 	}
 	return cacheRepository, nil
+}
+
+func (cache *CacheRepository) Set(order *entity.Order) {
+	cache.Mtx.Lock()
+	defer cache.Mtx.Unlock()
+	cache.Cache[order.OrderUID] = order
 }

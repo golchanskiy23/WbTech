@@ -2,6 +2,8 @@ package app
 
 import (
 	"Level0/config"
+	"Level0/internal/addingutils"
+	"Level0/internal/controller"
 	"Level0/internal/repository/cache"
 	"Level0/internal/repository/database"
 	"Level0/internal/repository/natsstreaming"
@@ -9,66 +11,14 @@ import (
 	"Level0/internal/utils"
 	"Level0/pkg/nats"
 	"Level0/pkg/postgres"
+	"Level0/pkg/server"
 	"context"
 	"fmt"
 	_ "github.com/lib/pq"
 	"log"
 	"os"
+	"time"
 )
-
-func InitInsertingDB(db *postgres.DatabaseSource) error {
-	order := utils.GetGivenOrder()
-	_, err := db.Pool.Exec(context.Background(), `
-	INSERT INTO orders (
-		order_uid, track_number, entry, locale, internal_signature,
-		customer_id, delivery_service, shard_key, sm_id, data_created, oof_shard
-	) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-`, order.OrderUID, order.TrackNumber, order.Entry, order.Locale, order.InternalSignature,
-		order.CustomerID, order.DeliveryService, order.ShardKey, order.SmID, order.DataCreated, order.OofShard)
-	if err != nil {
-		log.Fatal("insert orders:", err)
-		return err
-	}
-
-	_, err = db.Pool.Exec(context.Background(), `
-	INSERT INTO deliveries (
-		order_uid, name, phone, zip, city, address, region, email
-	) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-`, order.OrderUID, order.Delivery.Name, order.Delivery.Phone, order.Delivery.Zip,
-		order.Delivery.City, order.Delivery.Address, order.Delivery.Region, order.Delivery.Email)
-	if err != nil {
-		log.Fatal("insert deliveries:", err)
-		return err
-	}
-
-	_, err = db.Pool.Exec(context.Background(), `
-	INSERT INTO payments (
-		order_uid, transaction, request_id, currency, provider,
-		amount, payment_dt, bank, delivery_cost, goods_total, custom_fee
-	) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-`, order.OrderUID, order.Payment.Transaction, order.Payment.RequestID, order.Payment.Currency,
-		order.Payment.Provider, order.Payment.Amount, order.Payment.PaymentDT,
-		order.Payment.Bank, order.Payment.DeliveryCost, order.Payment.GoodsTotal, order.Payment.CustomFee)
-	if err != nil {
-		log.Fatal("insert payments:", err)
-		return err
-	}
-
-	for _, item := range order.Items {
-		_, err := db.Pool.Exec(context.Background(), `
-		INSERT INTO items (
-			order_uid, chrt_id, track_number, price, rid,
-			name, sale, size, total_price, nm_id, brand, status
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-	`, order.OrderUID, item.ChrtID, item.TrackNumber, item.Price, item.Rid,
-			item.Name, item.Sale, item.Size, item.TotalPrice, item.NmID, item.Brand, item.Status)
-		if err != nil {
-			log.Println("insert item:", err)
-			return err
-		}
-	}
-	return nil
-}
 
 func InitDB(db *postgres.DatabaseSource, path string) error {
 	file, err := os.ReadFile(path)
@@ -84,7 +34,7 @@ func InitDB(db *postgres.DatabaseSource, path string) error {
 		return err
 	}
 
-	err = InitInsertingDB(db)
+	err = addingutils.AddOrdersToDB(db, utils.GetGivenOrder())
 	if err != nil {
 		fmt.Println(3)
 		log.Fatal(err)
@@ -108,11 +58,11 @@ func RunApp(cfg *config.Config) {
 		db.Close()
 	}(db)
 
-	err = InitDB(db, "init.sql")
+	/*err = InitDB(db, "init.sql")
 	if err != nil {
 		log.Fatal(err)
 		return
-	}
+	}*/
 
 	natsSrc, err := nats.NewNatsSource(&cfg.NatsStreaming)
 	if err != nil {
@@ -140,31 +90,16 @@ func RunApp(cfg *config.Config) {
 		fmt.Printf("Failed to start nats service: %v", err)
 	}
 
-	/*
-		// бизнес-логика обработки заказов
-		orderService := CreateNewOrderService(pgStorage, cacheStorage)
-		// принимает и роутит запросы по нужным ручкам
-		orderController := CreateNewOrderController(orderService)
-		// и для сервера(+кастомизация с нужными параметрами)
-		server := http.Server{}
-		// запуск сервера , хэндлер которого - контроллер, роутящий запросы
-		http.ListenAndServe(fmt.Sprintf("localhost:%s", cfg.Server.Addr), orderController)
+	orderService := service.CreateNewOrderService(cacheRepository)
+	orderController := controller.CreateNewOrderController(orderService)
+	go ExecutePublisher()
+	time.Sleep(2 * time.Second)
 
-		osInterruptChan := make(chan os.Signal, 1)
-		signal.Notify(osInterruptChan, os.Interrupt)
-		select {
-		case <-osInterruptChan:
-			log.Fatal("OS interruption")
-		case <-server.Done():
-			log.Fatal("Server threw an error")
-		}
+	server := server.NewServer(orderController,
+		server.SetReadTimeout(6*time.Second),
+		server.SetWriteTimeout(6*time.Second),
+		server.SetAddr(cfg.Server.Addr),
+		server.SetShutdownTimeout(cfg.Server.ShutdownTimeout))
+	server.GracefulShutdown()
 
-		// context - (?)
-		err = server.Shutdown_()
-		if err != nil {
-			log.Fatal("Server shutdown failure")
-		}
-
-		log.Println("Server shutdown complete")
-	*/
 }

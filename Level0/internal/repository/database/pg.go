@@ -1,6 +1,7 @@
 package database
 
 import (
+	"Level0/internal/addingutils"
 	"Level0/internal/entity"
 	"Level0/pkg/postgres"
 	"context"
@@ -125,4 +126,12 @@ FROM orders o;
 	}
 
 	return orders, nil
+}
+
+func (r *DatabaseRepository) AddOrder(ctx context.Context, order entity.Order) error {
+	err := addingutils.AddOrdersToDB(r.DB, order)
+	if err != nil {
+		log.Fatalf("Error adding order #666: %v", err)
+	}
+	return nil
 }

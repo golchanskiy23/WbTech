@@ -6,6 +6,7 @@ require github.com/spf13/viper v1.20.1
 
 require (
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
+	github.com/go-chi/chi/v5 v5.2.1 // indirect
 	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect

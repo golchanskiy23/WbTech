@@ -12,8 +12,8 @@ database:
 
   
 server:
-  ShutdownTimeout : 5
-  Addr : "3333"
+  ShutdownTimeout : 20
+  Addr : ":3333"
 
 nats_streaming:
   URL : "localhost:4222"

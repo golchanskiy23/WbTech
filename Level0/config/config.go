@@ -22,7 +22,7 @@ type HttpServer struct {
 	ReadTimeout     *time.Duration `mapstructure:"read_timeout"`
 	WriteTimeout    *time.Duration `mapstructure:"write_timeout"`
 	Addr            string         `mapstructure:"addr"`
-	ShutdownTimeout *time.Duration `mapstructure:"shutdown_timeout"`
+	ShutdownTimeout time.Duration  `mapstructure:"shutdown_timeout"`
 }
 
 type DB struct {

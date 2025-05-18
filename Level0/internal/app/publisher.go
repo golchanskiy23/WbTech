@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"Level0/config"
@@ -20,7 +20,7 @@ const (
 // PUBLISHER, основная "труба"
 // подумать над генерацией идентификаторов клиентов и имён кластеров в NATS и их хранением
 // пока что в .env
-func main() {
+func ExecutePublisher() {
 	err := config.SystemVarsInit()
 	if err != nil {
 		log.Fatal(err)
@@ -51,7 +51,7 @@ func main() {
 			return
 		}
 		lastOrder = utils.RandomOrder()
-		fmt.Printf("Published Order: %s on channel %s\n", marshalled, channel)
+		//fmt.Printf("Published Order: %s on channel %s\n", marshalled, channel)
 		jitter := func(min, max time.Duration) time.Duration {
 			if min >= max {
 				return min

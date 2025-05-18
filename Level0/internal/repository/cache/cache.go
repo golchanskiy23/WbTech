@@ -4,6 +4,7 @@ import (
 	"Level0/internal/entity"
 	DBRepo "Level0/internal/repository/database"
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 )
@@ -32,5 +33,16 @@ func CreateNewCacheRepository(pg *DBRepo.DatabaseRepository) (*CacheRepository, 
 func (cache *CacheRepository) Set(order *entity.Order) {
 	cache.Mtx.Lock()
 	defer cache.Mtx.Unlock()
+	if _, b := cache.Cache[order.OrderUID]; b {
+		return
+	}
 	cache.Cache[order.OrderUID] = order
+}
+
+func (cache *CacheRepository) GetById(id string) (entity.Order, error) {
+	if val, isOk := cache.Cache[id]; !isOk {
+		return entity.Order{}, errors.New("Order Not Found")
+	} else {
+		return *val, nil
+	}
 }

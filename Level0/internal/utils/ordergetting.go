@@ -3,22 +3,23 @@ package utils
 import (
 	"Level0/internal/entity"
 	"encoding/json"
-	"log"
+	"fmt"
 	"os"
 )
 
-// не хардкодить .json файл
-func GetGivenOrder() entity.Order {
-	file, err := os.Open("model.json")
+const (
+	ModelFile = "model.json"
+)
+
+func GetGivenOrder() (entity.Order, error) {
+	file, err := os.Open(ModelFile)
 	if err != nil {
-		log.Fatal(err)
-		return entity.Order{}
+		return entity.Order{}, fmt.Errorf("error opening file: %v", err)
 	}
 	var order entity.Order
 	err = json.NewDecoder(file).Decode(&order)
 	if err != nil {
-		log.Fatal(err)
-		return entity.Order{}
+		return entity.Order{}, fmt.Errorf("error decoding file: %v", err)
 	}
-	return order
+	return order, nil
 }

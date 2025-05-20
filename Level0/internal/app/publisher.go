@@ -1,57 +1,47 @@
 package app
 
 import (
-	"Level0/config"
 	"Level0/internal/utils"
 	"encoding/json"
 	"fmt"
 	"github.com/nats-io/stan.go"
-	"log"
 	"math/rand"
 	"os"
 	"time"
 )
 
 const (
-	MinTime = 10 * time.Millisecond
-	MaxTime = 5000 * time.Millisecond
+	MinTime   = 10 * time.Millisecond
+	MaxTime   = 5000 * time.Millisecond
+	ClusterID = "CLUSTER_ID"
+	ClientID  = "CLIENT_ID"
 )
 
-// PUBLISHER, основная "труба"
-// подумать над генерацией идентификаторов клиентов и имён кластеров в NATS и их хранением
-// пока что в .env
-func ExecutePublisher() {
-	err := config.SystemVarsInit()
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-	sc, err := stan.Connect(os.Getenv("CLUSTER_ID"), os.Getenv("CLIENT_ID"), stan.NatsURL("nats://localhost:4222"))
-	if err != nil {
-		log.Fatal(fmt.Sprintf("%v", err))
-	}
-	// получаем ссылку на последний заказ из  model.json
-	lastOrder := utils.GetGivenOrder()
+func getConnection(host, port string) string {
+	return fmt.Sprintf("nats://%s:%s", host, port)
+}
 
-	// не хардкодить канал
-	channel := "subject"
-	// подумать над использованием контекста
+func ExecutePublisher() error {
+	sc, err := stan.Connect(os.Getenv(ClusterID), os.Getenv(ClientID), stan.NatsURL(getConnection("localhost", "4222")))
+	if err != nil {
+		return fmt.Errorf("can't connect to nats server: %v", err)
+	}
+	lastOrder, err := utils.GetGivenOrder()
+	if err != nil {
+		return fmt.Errorf("can't get given order: %v", err)
+	}
+
 	for counter := 1; ; counter++ {
 		marshalled, err := json.Marshal(lastOrder)
 		if err != nil {
-			log.Fatal(err)
-			return
+			return fmt.Errorf("can't marshal order: %v", err)
 		}
-		// пока что записываем заказы перед Publish, а не в Subscriber-е
-		// причём без многопоточности
 
-		err = sc.Publish(channel, marshalled)
-		if err != nil {
-			log.Fatal(err)
-			return
+		if err = sc.Publish(Channel, marshalled); err != nil {
+			return fmt.Errorf("can't publish order: %v", err)
 		}
+
 		lastOrder = utils.RandomOrder()
-		//fmt.Printf("Published Order: %s on channel %s\n", marshalled, channel)
 		jitter := func(min, max time.Duration) time.Duration {
 			if min >= max {
 				return min

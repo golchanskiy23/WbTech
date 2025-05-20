@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -17,9 +18,8 @@ const (
 )
 
 type Server struct {
-	internalServer *http.Server
-	channelErr     chan error
-	// Timer for context cancellation
+	internalServer  *http.Server
+	channelErr      chan error
 	shutdownTimeout time.Duration
 }
 
@@ -30,19 +30,20 @@ func (s *Server) FullShutdownTimeout() {
 	if err := s.internalServer.Shutdown(ctx); err != nil {
 		log.Fatalf("Server Shutdown Failed:%+v", err)
 	}
-	log.Fatalf("Server shutdown successfully")
+	log.Println("Server shutdown successfully")
 }
 
 func (s *Server) GracefulShutdown() {
 	osInterruptChan := make(chan os.Signal, 1)
-	signal.Notify(osInterruptChan, os.Interrupt, os.Kill)
+	signal.Notify(osInterruptChan, syscall.SIGTERM, syscall.SIGINT)
 	select {
 	case <-osInterruptChan:
-		log.Fatal("Interruption by user or system\n")
+		log.Printf("Server interrupted by system or user\n")
 	case err := <-s.channelErr:
-		log.Fatalf("Server threw an error %v", err)
-		s.FullShutdownTimeout()
+		log.Printf("Server threw an error %v\n", err)
 	}
+	close(osInterruptChan)
+	s.FullShutdownTimeout()
 }
 
 func (s *Server) Start() {

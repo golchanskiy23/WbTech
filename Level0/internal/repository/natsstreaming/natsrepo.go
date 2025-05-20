@@ -8,6 +8,6 @@ type NatsStreamingRepository struct {
 	NatsSrc *natsPkg.NatsSource
 }
 
-func CreateNewNatsStreamingRepository(nats *natsPkg.NatsSource) *NatsStreamingRepository {
-	return &NatsStreamingRepository{NatsSrc: nats}
+func CreateNewNatsStreamingRepository(nats *natsPkg.NatsSource) NatsStreamingRepository {
+	return NatsStreamingRepository{NatsSrc: nats}
 }

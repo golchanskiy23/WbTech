@@ -1,8 +1,8 @@
 package config
 
 import (
-	viper "github.com/spf13/viper"
-	"log"
+	"fmt"
+	"github.com/spf13/viper"
 	"time"
 )
 
@@ -47,18 +47,12 @@ func NewConfig() (*Config, error) {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("./config")
-	err := viper.ReadInConfig()
-	if err != nil {
-		// заменить обёртку ошибок
-		log.Fatal("Не удается найти файл .env : ", err)
-		return nil, err
+	if err := viper.ReadInConfig(); err != nil {
+		return nil, fmt.Errorf("fatal error config file: %s", err)
 	}
 
-	err = viper.Unmarshal(&cfg)
-	if err != nil {
-		// заменить обёртку ошибок
-		log.Fatal("Не удается загрузить среду: ", err)
-		return nil, err
+	if err := viper.Unmarshal(&cfg); err != nil {
+		return nil, fmt.Errorf("marshaling error: %s", err)
 	}
 	return cfg, nil
 }

@@ -6,23 +6,14 @@ import (
 	"log"
 )
 
-// Подумать над миграциями
-// initConfig from config-package
-// config for db
-// config for nats streaming
-// config for http-server
-// config for app - ?
-
 func main() {
-	err := config.SystemVarsInit()
-	if err != nil {
-		log.Fatal(err)
-		return
+	if err := config.SystemVarsInit(); err != nil {
+		log.Fatalf("System vars initialization failed: %v", err)
 	}
+
 	cfg, err := config.NewConfig()
 	if err != nil {
-		// какой-то обработчик ошибок
-		return
+		log.Fatalf("Error loading config: %v", err)
 	}
 	app.RunApp(cfg)
 }

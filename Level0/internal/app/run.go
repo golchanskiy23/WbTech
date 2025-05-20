@@ -2,7 +2,6 @@ package app
 
 import (
 	"Level0/config"
-	"Level0/internal/addingutils"
 	"Level0/internal/controller"
 	"Level0/internal/repository/cache"
 	"Level0/internal/repository/database"
@@ -20,80 +19,92 @@ import (
 	"time"
 )
 
+const (
+	SQLInitFile = "init.sql"
+	Channel     = "subject"
+	QueueGroup  = "queue_group"
+)
+
 func InitDB(db *postgres.DatabaseSource, path string) error {
 	file, err := os.ReadFile(path)
 	if err != nil {
-		fmt.Println(1)
-		log.Fatal(err)
-		return err
+		return fmt.Errorf("error reading file: %v", err)
 	}
-	_, err = db.Pool.Exec(context.Background(), string(file))
+	if _, err = db.Pool.Exec(context.Background(), string(file)); err != nil {
+		return fmt.Errorf("error executing sql: %v", err)
+	}
+	givenOrder, err := utils.GetGivenOrder()
 	if err != nil {
-		fmt.Println(2)
-		log.Fatal(err)
-		return err
+		return fmt.Errorf("error getting givenOrder: %v", err)
 	}
 
-	err = addingutils.AddOrdersToDB(db, utils.GetGivenOrder())
-	if err != nil {
-		fmt.Println(3)
-		log.Fatal(err)
-		return err
+	if err = postgres.AddOrdersToDB(db, givenOrder); err != nil {
+		return fmt.Errorf("error adding orders to database: %v", err)
 	}
 	return nil
 }
 
 func RunApp(cfg *config.Config) {
-	// инициализировать DB, включая туда данные из model.json(для этой задачи)
-	// если нужно изменить колонки таблицы - миграции, а не создание таблицы с нуля
-	fmt.Printf("Config for database: %v\n", cfg.Database)
 	db, err := postgres.NewStorage(postgres.GetConnection(&cfg.Database), postgres.SetMaxPoolSize(cfg.Database.MaxPoolSize))
-	err = db.Pool.Ping(context.Background())
-	if err != nil {
-		//поменять ошибку
-		log.Fatal(err)
+	if err = db.Pool.Ping(context.Background()); err != nil {
+		log.Fatalf("Error during creation database source: %v", err)
 	}
-	fmt.Printf("Connected to database: %v", db)
 	defer func(db *postgres.DatabaseSource) {
 		db.Close()
 	}(db)
 
-	/*err = InitDB(db, "init.sql")
-	if err != nil {
-		log.Fatal(err)
-		return
-	}*/
-
 	natsSrc, err := nats.NewNatsSource(&cfg.NatsStreaming)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Nats source error: %v", err)
 	}
-	fmt.Printf("Connected to nats source: %v", natsSrc)
+
 	defer natsSrc.Close()
 
 	pgRepository := database.CreateNewDBRepository(db)
 	natsRepository := natsstreaming.CreateNewNatsStreamingRepository(natsSrc)
-	fmt.Printf("DataSources created: %v %v\n", natsRepository, pgRepository)
-
 	cacheRepository, err := cache.CreateNewCacheRepository(pgRepository)
 	if err != nil {
-		fmt.Printf("Error during creation of repository: %v", err)
-		return
+		log.Fatalf("Error during creation of repository: %v", err)
 	}
-	fmt.Println(cacheRepository)
+
+	if cacheRepository.IsEmpty() {
+		if err = InitDB(db, SQLInitFile); err != nil {
+			log.Fatal(err)
+			return
+		}
+	}
 
 	natsService := service.CreateNewNatsService(pgRepository, natsRepository, cacheRepository)
-	subscription, err := natsService.StartSubscribing("subject", "queue_group")
+	subscription, err := natsService.StartSubscribing(Channel, QueueGroup)
 	defer subscription.Close()
 	if err != nil {
-		fmt.Println("4")
-		fmt.Printf("Failed to start nats service: %v", err)
+		log.Fatalf("Failed to start nats service: %v", err)
 	}
 
 	orderService := service.CreateNewOrderService(cacheRepository)
 	orderController := controller.CreateNewOrderController(orderService)
-	go ExecutePublisher()
-	time.Sleep(2 * time.Second)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	publisherChannel := make(chan error, 1)
+	go func() {
+		publisherChannel <- ExecutePublisher()
+		close(publisherChannel)
+	}()
+
+	select {
+	case err = <-publisherChannel:
+		if err != nil {
+			log.Fatalf("Failed to execute publisher: %v", err)
+		}
+	case <-ctx.Done():
+		go func() {
+			if err = <-publisherChannel; err != nil {
+				log.Fatalf("Failed during get some messages: %v", err)
+			}
+		}()
+	}
 
 	server := server.NewServer(orderController,
 		server.SetReadTimeout(6*time.Second),
@@ -101,5 +112,4 @@ func RunApp(cfg *config.Config) {
 		server.SetAddr(cfg.Server.Addr),
 		server.SetShutdownTimeout(cfg.Server.ShutdownTimeout))
 	server.GracefulShutdown()
-
 }

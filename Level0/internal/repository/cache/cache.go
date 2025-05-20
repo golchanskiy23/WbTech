@@ -14,15 +14,18 @@ type CacheRepository struct {
 	Cache map[string]*entity.Order
 }
 
-func CreateNewCacheRepository(pg *DBRepo.DatabaseRepository) (*CacheRepository, error) {
+func (repo CacheRepository) IsEmpty() bool {
+	return repo.Cache == nil || len(repo.Cache) == 0
+}
+
+func CreateNewCacheRepository(pg DBRepo.CRUDRepository) (*CacheRepository, error) {
 	cacheRepository := &CacheRepository{
 		Mtx:   &sync.RWMutex{},
 		Cache: make(map[string]*entity.Order),
 	}
 	orders, err := pg.GetAllOrders(context.Background())
 	if err != nil {
-		fmt.Println()
-		return nil, err
+		return nil, fmt.Errorf("error getting all orders: %v", err)
 	}
 	for _, order := range orders {
 		cacheRepository.Set(&order)

@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	ClusterID      = "Cluster_ID"
+	ClusterID      = "CLUSTER_ID"
 	SecondClientID = "SECOND_CLIENT_ID"
 )
 

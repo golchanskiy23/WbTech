@@ -23,6 +23,7 @@ func CreateNewCacheRepository(pg DBRepo.CRUDRepository) (*CacheRepository, error
 		Mtx:   &sync.RWMutex{},
 		Cache: make(map[string]*entity.Order),
 	}
+	// пока только локально
 	orders, err := pg.GetAllOrders(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("error getting all orders: %v", err)

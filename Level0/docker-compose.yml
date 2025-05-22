@@ -1,4 +1,24 @@
 services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: appuser
+    image:
+      "${DOCKER_USERNAME}/${DEVELOPMENT_STAGE}/demo-platform-handling:${VERSION}"
+    env_file:
+      - .env
+    ports:
+      - "3333:3333"
+    depends_on:
+        database:
+          condition: service_healthy
+        nats:
+          condition: service_healthy
+    environment:
+        DB_HOST: database
+        BROKER_HOST: nats
+
   database:
     restart:
       always
@@ -6,8 +26,13 @@ services:
       postgres:17
     environment:
       - POSTGRES_DB=wbtechdb
-      - POSTGRES_USERNAME=${POSTRGES_UNSAFE_USERNAME}
-      - POSTGRES_PASSWORD=${POSTRGES_UNSAFE_PASSWORD}
+      - POSTGRES_USERNAME=${POSTGRES_UNSAFE_USERNAME}
+      - POSTGRES_PASSWORD=${POSTGRES_UNSAFE_PASSWORD}
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-U", "postgres" ]
+      interval: 2s
+      timeout: 3s
+      retries: 10
     ports:
       - "5432:5432"
     volumes:
@@ -16,12 +41,15 @@ services:
   nats:
     env_file:
       - .env
-    image:
-      nats-streaming:latest
+    image: nats-streaming:latest
     ports:
       - "4222:4222"
+      - "8222:8222"
     command:
-      ["-p","4222","-cluster_id", "${CLUSTER_ID}"]
-    restart:
-      always
-
+      [ "-p", "4222", "-cluster_id", "${CLUSTER_ID}", "--http_port", "8222" ]
+    restart: always
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8222/varz" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5

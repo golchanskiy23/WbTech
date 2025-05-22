@@ -21,7 +21,6 @@ type App struct {
 type HttpServer struct {
 	ReadTimeout     *time.Duration `mapstructure:"read_timeout"`
 	WriteTimeout    *time.Duration `mapstructure:"write_timeout"`
-	Addr            string         `mapstructure:"addr"`
 	ShutdownTimeout time.Duration  `mapstructure:"shutdown_timeout"`
 }
 
@@ -47,6 +46,8 @@ func NewConfig() (*Config, error) {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("./config")
+	viper.AutomaticEnv()
+
 	if err := viper.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("fatal error config file: %s", err)
 	}

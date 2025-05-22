@@ -30,13 +30,22 @@ const (
 func GetConnection(cfg *config.DB) string {
 	dsn := fmt.Sprintf("%s://%s:%s@%s:%d/%s?sslmode=%s",
 		"postgres",
-		os.Getenv("POSTRGES_UNSAFE_USERNAME"),
-		os.Getenv("POSTRGES_UNSAFE_PASSWORD"),
+		os.Getenv("POSTGRES_UNSAFE_USERNAME"),
+		os.Getenv("POSTGRES_UNSAFE_PASSWORD"),
 		cfg.Host,
 		cfg.Port,
 		cfg.Name,
 		cfg.SSLMode,
 	)
+	// для докера
+	/*dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+		cfg.Host,
+		cfg.Port,
+		os.Getenv("POSTGRES_UNSAFE_USERNAME"),
+		os.Getenv("POSTGRES_UNSAFE_PASSWORD"),
+		cfg.Name,
+		cfg.SSLMode,
+	)*/
 	return dsn
 }
 

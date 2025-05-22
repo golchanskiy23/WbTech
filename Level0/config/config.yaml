@@ -5,6 +5,7 @@ app:
 database:
   Name : "wbtechdb"
   Host : "localhost"
+  #Host : "database"
   Port : 5432
   SSLMode : "disable"
   Schema : "public"
@@ -13,7 +14,7 @@ database:
   
 server:
   ShutdownTimeout : 20
-  Addr : ":3333"
 
 nats_streaming:
+  #URL : "nats:4222"
   URL : "localhost:4222"

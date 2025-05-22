@@ -44,6 +44,24 @@ func InitDB(db *postgres.DatabaseSource, path string) error {
 	return nil
 }
 
+func CheckIsDBEmpty(db database.DatabaseRepository, ctx context.Context) bool {
+	var count int
+	err := db.DB.Pool.QueryRow(ctx, `
+	SELECT COUNT(*) 
+	FROM information_schema.tables 
+	WHERE table_schema = 'public'
+`).Scan(&count)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if count == 0 {
+		return false
+	}
+	return true
+}
+
 func RunApp(cfg *config.Config) {
 	db, err := postgres.NewStorage(postgres.GetConnection(&cfg.Database), postgres.SetMaxPoolSize(cfg.Database.MaxPoolSize))
 	if err = db.Pool.Ping(context.Background()); err != nil {
@@ -62,6 +80,13 @@ func RunApp(cfg *config.Config) {
 
 	pgRepository := database.CreateNewDBRepository(db)
 	natsRepository := natsstreaming.CreateNewNatsStreamingRepository(natsSrc)
+	// для docker
+	/*if CheckIsDBEmpty(pgRepository, context.Background()) {
+		if err = InitDB(db, SQLInitFile); err != nil {
+			log.Fatal(err)
+			return
+		}
+	}*/
 	cacheRepository, err := cache.CreateNewCacheRepository(pgRepository)
 	if err != nil {
 		log.Fatalf("Error during creation of repository: %v", err)
@@ -109,7 +134,7 @@ func RunApp(cfg *config.Config) {
 	server := server.NewServer(orderController,
 		server.SetReadTimeout(6*time.Second),
 		server.SetWriteTimeout(6*time.Second),
-		server.SetAddr(cfg.Server.Addr),
+		server.SetAddr(),
 		server.SetShutdownTimeout(cfg.Server.ShutdownTimeout))
 	server.GracefulShutdown()
 }

@@ -103,7 +103,56 @@ func (r DatabaseRepository) GetAllOrders(ctx context.Context) ([]entity.Order, e
   ) AS items
 FROM orders o;
 `
-	rows, err := r.DB.Pool.Query(context.Background(), query)
+
+	rows, err := r.DB.Pool.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("error querying orders: %w", err)
+	}
+	defer rows.Close()
+
+	var orders []entity.Order
+	for rows.Next() {
+		var o entity.Order
+		var deliveryJSON, paymentJSON, itemsJSON []byte
+
+		err = rows.Scan(
+			&o.OrderUID,
+			&o.TrackNumber,
+			&o.Entry,
+			&o.Locale,
+			&o.InternalSignature,
+			&o.CustomerID,
+			&o.DeliveryService,
+			&o.ShardKey,
+			&o.SmID,
+			&o.DataCreated,
+			&o.OofShard,
+			&deliveryJSON,
+			&paymentJSON,
+			&itemsJSON,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("scan error: %w", err)
+		}
+
+		sliceBytes := [][]byte{deliveryJSON, paymentJSON, itemsJSON}
+		phrases := []string{"delivery parse error", "payment parse error", "items parse error"}
+		labels := []string{DeliveryLabel, PaymentLabel, ItemLabel}
+		for i := 0; i < 3; i++ {
+			if err = unmarshalling(sliceBytes[i], &o, phrases[i], labels[i]); err != nil {
+				return nil, err
+			}
+		}
+
+		orders = append(orders, o)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return orders, nil
+	/*rows, err := r.DB.Pool.Query(context.Background(), query)
 	if err != nil {
 		return nil, fmt.Errorf("incorrect getting all order")
 	}
@@ -147,7 +196,7 @@ FROM orders o;
 		orders = append(orders, o)
 	}
 
-	return orders, nil
+	return orders, nil*/
 }
 
 func (r DatabaseRepository) AddOrder(ctx context.Context, order entity.Order) error {

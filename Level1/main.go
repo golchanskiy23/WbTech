@@ -342,6 +342,97 @@ func task8() {
 	fmt.Println(setBit(2, 0, n))
 }
 
+func filter(x int) int {
+	return x * 2
+}
+
+func worker9(ch <-chan int, wg *sync.WaitGroup) {
+	defer wg.Done()
+	for v := range ch {
+		fmt.Println(v)
+	}
+}
+
+func task9() {
+	inCh := make(chan int)
+	outputCh := make(chan int)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	wg := sync.WaitGroup{}
+	for i := 0; i < 3; i++ {
+		wg.Add(1)
+		go worker9(outputCh, &wg)
+	}
+
+	go func() {
+		defer close(outputCh)
+		for v := range inCh {
+			filtered := filter(v)
+			outputCh <- filtered
+		}
+	}()
+
+	cnt := 0
+loop:
+	for {
+		select {
+		case <-ctx.Done():
+			fmt.Print("End of input numbers\n")
+			break loop
+		case inCh <- cnt:
+			cnt++
+			fmt.Printf("Number %d pulled into input channel\n", cnt)
+			time.Sleep(500 * time.Millisecond)
+		}
+	}
+	close(inCh)
+	wg.Wait()
+}
+
+func task10() {
+	arr := []float64{-25.4, -27.0, 13.0, 19.0,
+		15.5, 24.5, -21.0, 32.5}
+	m := make(map[int][]float64)
+	for i := 0; i < len(arr); i++ {
+		key := (int)(arr[i]/10) * 10
+		m[key] = append(m[key], arr[i])
+	}
+	for k, v := range m {
+		fmt.Printf("Key %d with value %v\n", k, v)
+	}
+}
+
+func intersection(arr1, arr2 []int) map[int]struct{} {
+	m1, ansMap := make(map[int]struct{}), make(map[int]struct{})
+	for i := 0; i < len(arr1); i++ {
+		m1[arr1[i]] = struct{}{}
+	}
+	for i := 0; i < len(arr2); i++ {
+		if _, ok := m1[arr2[i]]; ok {
+			ansMap[arr2[i]] = struct{}{}
+		}
+	}
+	return ansMap
+}
+
+func task11() {
+	set1 := []int{3, 4, 5, 6, 7, 8, 9}
+	set2 := []int{1, 2, 3, 5, 6, 7, 10, 11, 12}
+	intersectionMap := intersection(set1, set2)
+	fmt.Println(intersectionMap)
+}
+
+type linuxCommandsSet = map[string]struct{}
+
+func task12() linuxCommandsSet {
+	set := linuxCommandsSet{}
+	str := []string{"cat", "cat", "dog", "cat", "tree"}
+	for _, v := range str {
+		set[v] = struct{}{}
+	}
+	return set
+}
+
 func main() {
-	task8()
+	fmt.Print(task12())
 }

@@ -45,7 +45,7 @@ build: clean
 ## run: Запускает собранный бинарник или контейнер
 run:
 ifeq ($(mode),local)
-	./bin/${BINARY_NAME} -mode=local
+	bin\${BINARY_NAME} -mode=local
 else ifeq ($(mode),docker)
 	docker compose --env-file .env.container up --build
 else

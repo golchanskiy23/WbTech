@@ -41,17 +41,25 @@ services:
   nats:
     env_file:
       - .env.container
-    image: nats-streaming:latest
+    image: docker.io/nats:2.9.20
     ports:
       - "4222:4222"
       - "8222:8222"
-    environment:
-      CLUSTER_ID: ${CLUSTER_ID}
+    volumes:
+      - nats1:/data
+    #environment:
+    #  CLUSTER_ID: ${CLUSTER_ID}
+    container_name: nats-js
     command:
-      [ "-p", "4222", "-cluster_id", "${CLUSTER_ID}", "--http_port", "8222" ]
+      ["-js","-m","8222"]
+    #  [ "-p", "4222", "-cluster_id", "${CLUSTER_ID}", "--http_port", "8222" ]
     restart: always
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8222/varz" ]
       interval: 5s
       timeout: 3s
       retries: 5
+
+volumes:
+  nats1:
+    external: true

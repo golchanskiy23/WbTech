@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/stan.go"
 	"log"
 )
@@ -19,11 +20,11 @@ type NatsStreamingService interface {
 
 type NatsService struct {
 	PgRepository    database.CRUDRepository
-	NatsRepository  natsstreaming.NatsStreamingRepository
+	NatsRepository  natsstreaming.NatsJetStreamRepository
 	CacheRepository *cache.CacheRepository
 }
 
-func CreateNewNatsService(pg database.CRUDRepository, nats natsstreaming.NatsStreamingRepository, cache *cache.CacheRepository) NatsService {
+func CreateNewNatsService(pg database.CRUDRepository, nats natsstreaming.NatsJetStreamRepository, cache *cache.CacheRepository) NatsService {
 	return NatsService{PgRepository: pg, NatsRepository: nats, CacheRepository: cache}
 }
 
@@ -43,8 +44,8 @@ func (s NatsService) AddOrderToCache(order *entity.Order) {
 	fmt.Println()
 }
 
-func (service NatsService) StartSubscribing(channel, queue_group string) (stan.Subscription, error) {
-	return service.NatsRepository.NatsSrc.Conn.QueueSubscribe(channel, queue_group, func(msg *stan.Msg) {
+func (service NatsService) StartSubscribing(subject, durable string) (*nats.Subscription, error) {
+	return service.NatsRepository.NatsSrc.JetStream.QueueSubscribe(subject, durable, func(msg *nats.Msg) {
 		if err := service.handleMessage(msg); err != nil {
 			log.Fatal(err)
 			return
@@ -53,10 +54,15 @@ func (service NatsService) StartSubscribing(channel, queue_group string) (stan.S
 		json.Unmarshal(msg.Data, &order)
 		service.AddOrderToDB(order)
 		service.AddOrderToCache(&order)
-	})
+		if err := msg.Ack(); err != nil {
+			log.Printf("ack error: %v", err)
+		}
+	},
+		nats.Durable(durable),
+	)
 }
 
-func (service NatsService) handleMessage(msg *stan.Msg) error {
+func (service NatsService) handleMessage(msg *nats.Msg) error {
 	var order entity.Order
 	err := json.Unmarshal(msg.Data, &order)
 	if err != nil {

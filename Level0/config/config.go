@@ -10,7 +10,7 @@ type Config struct {
 	App           App        `mapstructure:"app"`
 	Server        HttpServer `mapstructure:"server"`
 	Database      DB         `mapstructure:"database"`
-	NatsStreaming NATS       `mapstructure:"nats_streaming"`
+	NatsStreaming Jets       `mapstructure:"nats_streaming"`
 }
 
 type App struct {
@@ -36,7 +36,7 @@ type DB struct {
 
 type Mode string
 
-type NATS struct {
+type Jets struct {
 	Port string `mapstructure:"port"`
 }
 

@@ -8,12 +8,13 @@ import (
 	"Level0/internal/repository/natsstreaming"
 	"Level0/internal/service"
 	"Level0/internal/utils"
-	"Level0/pkg/nats"
+	internal_nats "Level0/pkg/nats"
 	"Level0/pkg/postgres"
 	"Level0/pkg/server"
 	"context"
 	"fmt"
 	_ "github.com/lib/pq"
+	"github.com/nats-io/nats.go"
 	"log"
 	"os"
 	"time"
@@ -21,8 +22,8 @@ import (
 
 const (
 	SQLInitFile = "init.sql"
-	Channel     = "subject"
-	QueueGroup  = "queue_group"
+	Channel     = "orders.getter"
+	QueueGroup  = "orders_group"
 )
 
 func InitDB(db *postgres.DatabaseSource, path string) error {
@@ -62,6 +63,37 @@ func CheckIsDBEmpty(db database.DatabaseRepository, ctx context.Context) bool {
 	return true
 }
 
+type JetsResponse struct {
+	Conn *nats.Conn
+	Js   nats.JetStreamContext
+	Err  error
+}
+
+func InitJetStream(cfg *config.Config) JetsResponse {
+	nc, err := nats.Connect(getConnection(os.Getenv("NATS_HOST"), cfg.NatsStreaming.Port))
+	if err != nil {
+		return JetsResponse{Conn: nil, Err: fmt.Errorf("can't connect to JetStream: %v", err), Js: nil}
+	}
+	js, err := nc.JetStream()
+	if err != nil {
+		return JetsResponse{Conn: nil, Err: fmt.Errorf("can't get JetStream context: %v", err), Js: nil}
+	}
+
+	_, err = js.StreamInfo("ORDER_STREAM")
+	if err == nats.ErrStreamNotFound {
+		_, err = js.AddStream(&nats.StreamConfig{
+			Name:     "ORDER_STREAM",
+			Subjects: []string{"orders.*"},
+		})
+		if err != nil {
+			return JetsResponse{Conn: nil, Err: fmt.Errorf("can't add stream: %w", err), Js: nil}
+		}
+	} else if err != nil {
+		return JetsResponse{Conn: nil, Err: fmt.Errorf("can't check stream: %w", err), Js: nil}
+	}
+	return JetsResponse{Conn: nc, Js: js, Err: nil}
+}
+
 func RunApp(cfg *config.Config) {
 	db, err := postgres.NewStorage(postgres.GetConnection(&cfg.Database), postgres.SetMaxPoolSize(cfg.Database.MaxPoolSize))
 	fmt.Println(postgres.GetConnection(&cfg.Database))
@@ -72,7 +104,12 @@ func RunApp(cfg *config.Config) {
 		db.Close()
 	}(db)
 
-	natsSrc, err := nats.NewNatsSource(&cfg.NatsStreaming)
+	response := InitJetStream(cfg)
+	if response.Err != nil {
+		log.Fatal(response.Err)
+	}
+	fmt.Println(response)
+	natsSrc, err := internal_nats.NewNatsSource(response.Conn, response.Js)
 	if err != nil {
 		log.Fatalf("Nats source error: %v", err)
 	}
@@ -80,7 +117,7 @@ func RunApp(cfg *config.Config) {
 	defer natsSrc.Close()
 
 	pgRepository := database.CreateNewDBRepository(db)
-	natsRepository := natsstreaming.CreateNewNatsStreamingRepository(natsSrc)
+	natsRepository := natsstreaming.NewNatsJetStreamRepository(natsSrc)
 	// для docker
 	orders, err := pgRepository.GetAllOrders(context.Background())
 	if err != nil {
@@ -104,9 +141,9 @@ func RunApp(cfg *config.Config) {
 		}
 	}
 
-	natsService := service.CreateNewNatsService(pgRepository, natsRepository, cacheRepository)
+	natsService := service.CreateNewNatsService(pgRepository, *natsRepository, cacheRepository)
 	subscription, err := natsService.StartSubscribing(Channel, QueueGroup)
-	defer subscription.Close()
+	defer subscription.Unsubscribe()
 	if err != nil {
 		log.Fatalf("Failed to start nats service: %v", err)
 	}
@@ -118,10 +155,10 @@ func RunApp(cfg *config.Config) {
 	defer cancel()
 
 	publisherChannel := make(chan error, 1)
-	go func() {
-		publisherChannel <- ExecutePublisher()
+	go func(j nats.JetStreamContext, c *nats.Conn) {
+		publisherChannel <- ExecutePublisher(j, c)
 		close(publisherChannel)
-	}()
+	}(response.Js, response.Conn)
 
 	select {
 	case err = <-publisherChannel:
@@ -131,7 +168,7 @@ func RunApp(cfg *config.Config) {
 	case <-ctx.Done():
 		go func() {
 			if err = <-publisherChannel; err != nil {
-				log.Fatalf("Failed during get some messages: %v", err)
+				log.Fatalf("End of service work: %v", err)
 			}
 		}()
 	}

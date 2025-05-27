@@ -2,14 +2,25 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log"
 	"math/rand"
 	"os"
 	"os/signal"
+	"reflect"
+	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
+)
+
+var (
+	TEST_ARR     = []int{3, 4, 5, 6, 3, 2, 1, 12, 2, 5, 7, 1, 9}
+	TEST_STR     = "abcdefghijklmnop"
+	TEST_ARR_STR = "snow dog sun"
 )
 
 type Human struct {
@@ -433,6 +444,161 @@ func task12() linuxCommandsSet {
 	return set
 }
 
+func task13() {
+	var a, b int32 = 4, 6
+	fmt.Printf("Variables before swapping: %d %d\n", a, b)
+	a, b = b, a
+	fmt.Printf("Variables after swapping: %d %d\n", a, b)
+}
+
+func ValType(arr []interface{}) []string {
+	var slice []string
+	for _, v := range arr {
+		switch reflect.TypeOf(v).Kind().String() {
+		case "int":
+			slice = append(slice, "int")
+		case "string":
+			slice = append(slice, "string")
+		case "bool":
+			slice = append(slice, "bool")
+		case "chan":
+			slice = append(slice, "chan int")
+		}
+	}
+	return slice
+}
+
+func task14() []string {
+	// int, string, bool, channel
+	var slice = []interface{}{3, "stringVal", true, make(chan struct{})}
+	return ValType(slice)
+}
+
+func createHugeString(n int) string {
+	return string(make([]byte, n))
+}
+
+func someFunc() string {
+	var justString string
+	v := createHugeString(1 << 10)
+	justString = v[:100]
+	v = string([]byte(justString))
+	return v
+}
+
+func task15() {
+	ans := someFunc()
+	fmt.Println(ans)
+}
+
+func partition(arr []int, low, high int) int {
+	pivot := arr[high] // выбор опорного элемента
+	i := low - 1       // индекс меньшего элемента
+
+	for j := low; j <= high-1; j++ {
+		if arr[j] <= pivot {
+			i++
+			arr[i], arr[j] = arr[j], arr[i]
+		}
+	}
+	arr[i+1], arr[high] = arr[high], arr[i+1]
+	return i + 1
+}
+
+// функция quickSort реализует алгоритм быстрой сортировки
+func quickSort(arr []int, low, high int) {
+	if low < high {
+		// pi - индекс опорного элемента, arr[pi] находится на правильном месте
+		pi := partition(arr, low, high)
+
+		// Рекурсивно сортируем элементы перед разделением и после разделения
+		quickSort(arr, low, pi-1)
+		quickSort(arr, pi+1, high)
+	}
+}
+
+func task16() {
+	fmt.Printf("Array before sorting: %v", TEST_ARR)
+	quickSort(TEST_ARR, 0, len(TEST_ARR)-1)
+	fmt.Printf("Array after sorting: %v", TEST_ARR)
+}
+
+func binarySearch(l, r, target int) (int, error) {
+	if l >= r && TEST_ARR[l] != target {
+		return -1, errors.New("not found such position")
+	}
+	mid := l + (r-l)/2
+	if TEST_ARR[mid] == target {
+		return mid, nil
+	} else if TEST_ARR[mid] > target {
+		return binarySearch(l, mid-1, target)
+	}
+	return binarySearch(mid+1, r, target)
+}
+
+func task17() int {
+	target, n := 5, len(TEST_ARR)-1
+	quickSort(TEST_ARR, 0, n)
+	sort.Ints(TEST_ARR)
+	pos, err := binarySearch(0, n, target)
+	if err != nil {
+		log.Printf("binary search err: %v", err)
+		return pos
+	}
+	return pos
+}
+
+func task18() int {
+	counter, goroutinesSize := 0, 1000
+	ch := make(chan int)
+	wg, wgReader := sync.WaitGroup{}, sync.WaitGroup{}
+	mtx := sync.Mutex{}
+
+	wgReader.Add(1)
+	go func() {
+		defer wgReader.Done()
+		for v := range ch {
+			mtx.Lock()
+			counter += v
+			mtx.Unlock()
+		}
+	}()
+
+	for i := 1; i <= goroutinesSize; i++ {
+		wg.Add(1)
+		go func(num int) {
+			defer wg.Done()
+			ch <- num
+		}(i)
+	}
+
+	wg.Wait()
+	close(ch)
+	wgReader.Wait()
+	return (2*counter)/goroutinesSize - 1
+}
+
+func swapString(runeArr []string) {
+	l, r := 0, len(runeArr)-1
+	for l < r {
+		runeArr[l], runeArr[r] = runeArr[r], runeArr[l]
+		l++
+		r--
+	}
+}
+
+func task19() string {
+	runeArr := strings.Split(TEST_STR, "")
+	swapString(runeArr)
+	return strings.Join(runeArr, "")
+}
+
+func task20() string {
+	runeArr := strings.Split(TEST_ARR_STR, " ")
+	swapString(runeArr)
+	return strings.Join(runeArr, " ")
+}
+
 func main() {
-	fmt.Print(task12())
+
 }

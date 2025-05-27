@@ -17,7 +17,7 @@ type NatsSource struct {
 }
 
 func NewNatsSource(cfg *config.NATS) (*NatsSource, error) {
-	conn, err := stan.Connect(os.Getenv(ClusterID), os.Getenv(SecondClientID), stan.NatsURL(cfg.URL))
+	conn, err := stan.Connect(os.Getenv(ClusterID), os.Getenv(SecondClientID), stan.NatsURL(fmt.Sprintf("%s:%s", os.Getenv("NATS_URL"), cfg.Port)))
 	if err != nil {
 		return nil, fmt.Errorf("error during connection with nats: %v", err)
 	}

@@ -5,8 +5,15 @@ import (
 	"github.com/joho/godotenv"
 )
 
-func SystemVarsInit() error {
-	if err := godotenv.Load(); err != nil {
+func DockerSystemVarsInit() error {
+	if err := godotenv.Load(".env.container"); err != nil {
+		return fmt.Errorf("error loading .env file: %v", err)
+	}
+	return nil
+}
+
+func LocalSystemVarsInit() error {
+	if err := godotenv.Load(".env.local"); err != nil {
 		return fmt.Errorf("error loading .env file: %v", err)
 	}
 	return nil

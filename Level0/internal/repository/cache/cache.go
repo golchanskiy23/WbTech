@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"sync"
 )
 
@@ -28,7 +29,10 @@ func CreateNewCacheRepository(pg DBRepo.CRUDRepository) (*CacheRepository, error
 	if err != nil {
 		return nil, fmt.Errorf("error getting all orders: %v", err)
 	}
+	log.Printf("Got %d orders from DB", len(orders))
 	for _, order := range orders {
+		//fmt.Print(order, " ")
+		//fmt.Println()
 		cacheRepository.Set(&order)
 	}
 	return cacheRepository, nil

@@ -1,9 +1,11 @@
-include .env
+include .env.local
+include .env.container
 .PHONY: docker-commit docker-compose compile run help
 
 END=
 DEVELOPMENT_STAGE=demo
 VERSION=v1.0.0
+mode=
 
 ifndef DEVELOPMENT_STAGE
 $(error DEVELOPMENT_STAGE is not set. Usage: make run DEVELOPMENT_STAGE=stage)
@@ -22,13 +24,12 @@ BINARY_NAME = main$(END)
 ## compile: Собирает бинарник, запускает линтеры и тесты (tools + test + build)
 compile: tools test build
 ## docker-commit: Собирает и пушит Docker-образ (docker-build + docker-push)
-docker-commit: docker-build docker-push
+docker-commit: docker-push
 
-# +build - ?
-docker-build:
-	set ADDR=":3333" && docker-compose up --build
+docker-compose:
+	docker compose --env-file .env.container up --build
 
-docker-push: docker-build
+docker-push: docker-compose
 	docker push $(DOCKER_USERNAME)/$(DEVELOPMENT_STAGE)/demo-platform-handling:$(VERSION)
 
 tools:
@@ -41,9 +42,16 @@ build: clean
 	mkdir bin
 	set ADDR="localhost:3333" && go build -o ./bin/${BINARY_NAME} ./cmd/app/main.go
 
-## run: Запускает собранный бинарник
+## run: Запускает собранный бинарник или контейнер
 run:
-	./bin/${BINARY_NAME}
+ifeq ($(mode),local)
+	./bin/${BINARY_NAME} -mode=local
+else ifeq ($(mode),docker)
+	docker compose --env-file .env.container up --build
+else
+	$(error Unknown mode "$(mode)". Use 'local' or 'docker')
+endif
+
 
 RM = rmdir /S /Q
 ifneq ($(OS),Windows_NT)

@@ -26,7 +26,6 @@ type HttpServer struct {
 
 type DB struct {
 	Name        string `mapstructure:"name"`
-	Host        string `mapstructure:"host"`
 	Port        int    `mapstructure:"port"`
 	SSLMode     Mode   `mapstructure:"SSLMode"`
 	Schema      string `mapstructure:"schema"`
@@ -38,7 +37,7 @@ type DB struct {
 type Mode string
 
 type NATS struct {
-	URL string `mapstructure:"url"`
+	Port string `mapstructure:"port"`
 }
 
 func NewConfig() (*Config, error) {

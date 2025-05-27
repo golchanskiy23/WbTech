@@ -1,23 +1,23 @@
 services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    user: appuser
-    image:
-      "${DOCKER_USERNAME}/${DEVELOPMENT_STAGE}/demo-platform-handling:${VERSION}"
-    env_file:
-      - .env
-    ports:
-      - "3333:3333"
-    depends_on:
-        database:
-          condition: service_healthy
-        nats:
-          condition: service_healthy
-    environment:
-        DB_HOST: database
-        BROKER_HOST: nats
+#  app:
+    #build:
+    #  context: .
+    #  dockerfile: Dockerfile
+#    user: appuser
+    #image:
+    #  "${DOCKER_USERNAME}/${DEVELOPMENT_STAGE}/demo-platform-handling:${VERSION}"
+#    env_file:
+#      - .env.container
+#    ports:
+#      - "3333:3333"
+#    depends_on:
+#        database:
+#          condition: service_healthy
+#        nats:
+#          condition: service_healthy
+#    environment:
+#        DB_HOST: database
+#        BROKER_HOST: nats
 
   database:
     restart:
@@ -40,11 +40,13 @@ services:
 
   nats:
     env_file:
-      - .env
+      - .env.container
     image: nats-streaming:latest
     ports:
       - "4222:4222"
       - "8222:8222"
+    environment:
+      CLUSTER_ID: ${CLUSTER_ID}
     command:
       [ "-p", "4222", "-cluster_id", "${CLUSTER_ID}", "--http_port", "8222" ]
     restart: always

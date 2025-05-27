@@ -64,6 +64,7 @@ func CheckIsDBEmpty(db database.DatabaseRepository, ctx context.Context) bool {
 
 func RunApp(cfg *config.Config) {
 	db, err := postgres.NewStorage(postgres.GetConnection(&cfg.Database), postgres.SetMaxPoolSize(cfg.Database.MaxPoolSize))
+	fmt.Println(postgres.GetConnection(&cfg.Database))
 	if err = db.Pool.Ping(context.Background()); err != nil {
 		log.Fatalf("Error during creation database source: %v", err)
 	}
@@ -81,12 +82,16 @@ func RunApp(cfg *config.Config) {
 	pgRepository := database.CreateNewDBRepository(db)
 	natsRepository := natsstreaming.CreateNewNatsStreamingRepository(natsSrc)
 	// для docker
-	/*if CheckIsDBEmpty(pgRepository, context.Background()) {
+	orders, err := pgRepository.GetAllOrders(context.Background())
+	if err != nil {
+		log.Fatalf("Error during cache initialization: %v", err)
+	} else if len(orders) == 0 {
 		if err = InitDB(db, SQLInitFile); err != nil {
 			log.Fatal(err)
 			return
 		}
-	}*/
+	}
+
 	cacheRepository, err := cache.CreateNewCacheRepository(pgRepository)
 	if err != nil {
 		log.Fatalf("Error during creation of repository: %v", err)
@@ -109,7 +114,7 @@ func RunApp(cfg *config.Config) {
 	orderService := service.CreateNewOrderService(cacheRepository)
 	orderController := controller.CreateNewOrderController(orderService)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	publisherChannel := make(chan error, 1)

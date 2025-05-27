@@ -23,7 +23,7 @@ func getConnection(host, port string) string {
 
 func ExecutePublisher() error {
 	// localhost -> nats
-	sc, err := stan.Connect(os.Getenv(ClusterID), os.Getenv(ClientID), stan.NatsURL(getConnection("localhost", "4222")))
+	sc, err := stan.Connect(os.Getenv(ClusterID), os.Getenv(ClientID), stan.NatsURL(getConnection(os.Getenv("NATS_HOST"), "4222")))
 	if err != nil {
 		return fmt.Errorf("can't connect to nats server: %v", err)
 	}

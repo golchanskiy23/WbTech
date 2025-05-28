@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -23,17 +24,18 @@ type Server struct {
 	shutdownTimeout time.Duration
 }
 
-func (s *Server) FullShutdownTimeout() {
+func (s *Server) FullShutdownTimeout() error {
 	ctx, cancel := context.WithTimeout(context.Background(), s.shutdownTimeout)
 	defer cancel()
 	log.Println("Shutting down server...")
 	if err := s.internalServer.Shutdown(ctx); err != nil {
-		log.Fatalf("Server Shutdown Failed:%+v", err)
+		return fmt.Errorf("server shutdown filed: %v", err)
 	}
 	log.Println("Server shutdown successfully")
+	return nil
 }
 
-func (s *Server) GracefulShutdown() {
+func (s *Server) GracefulShutdown() error {
 	osInterruptChan := make(chan os.Signal, 1)
 	signal.Notify(osInterruptChan, syscall.SIGTERM, syscall.SIGINT)
 	select {
@@ -43,7 +45,10 @@ func (s *Server) GracefulShutdown() {
 		log.Printf("Server threw an error %v\n", err)
 	}
 	close(osInterruptChan)
-	s.FullShutdownTimeout()
+	if err := s.FullShutdownTimeout(); err != nil {
+		return fmt.Errorf("graceful shutdown collapsed: %v", err)
+	}
+	return nil
 }
 
 func (s *Server) Start() {

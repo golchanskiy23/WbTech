@@ -17,8 +17,7 @@ type OrderService struct {
 func (s OrderService) GetOrderById(id string) (entity.Order, error) {
 	order, err := s.CacheRepo.GetById(id)
 	if err != nil {
-		fmt.Errorf("Error getting order by id %s", id)
-		return entity.Order{}, err
+		return entity.Order{}, fmt.Errorf("error getting order by id %s", id)
 	}
 	return order, nil
 }

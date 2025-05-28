@@ -1,10 +1,10 @@
 include .env.local
 include .env.container
-.PHONY: docker-commit docker-compose compile run help
+.PHONY: docker-commit docker-compose compile linting run help
 
 END=
 DEVELOPMENT_STAGE=demo
-VERSION=v1.0.0
+APPVERSION=v1.0.0
 mode=
 
 ifndef DEVELOPMENT_STAGE
@@ -33,7 +33,13 @@ docker-push: docker-compose
 	docker push $(DOCKER_USERNAME)/$(DEVELOPMENT_STAGE)/demo-platform-handling:$(VERSION)
 
 tools:
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	@echo " > Install linter and mockgen dependencies here"
+
+linting:
+	golangci-lint run ./...
+#--config=.golangci.yaml
+
 
 test:
 	@echo " > Run tests, profiling, coverage checks here"

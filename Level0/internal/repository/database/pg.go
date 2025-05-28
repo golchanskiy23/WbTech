@@ -15,43 +15,8 @@ const (
 	ItemLabel     = "I"
 )
 
-type CRUDRepository interface {
-	GetAllOrders(ctx context.Context) ([]entity.Order, error)
-	AddOrder(ctx context.Context, order entity.Order) error
-}
-
-type DatabaseRepository struct {
-	DB *postgres.DatabaseSource
-}
-
-func unmarshalling(src []byte, order *entity.Order, str, label string) error {
-	if len(src) > 0 {
-		var err error
-		switch label {
-		case "D":
-			err = json.Unmarshal(src, &order.Delivery)
-		case "P":
-			err = json.Unmarshal(src, &order.Payment)
-		case "I":
-			err = json.Unmarshal(src, &order.Items)
-		default:
-			return fmt.Errorf("unknown unmarshal target")
-		}
-
-		if err != nil {
-			return fmt.Errorf("%s : %v", str, err)
-		}
-		return nil
-	}
-	return errors.New("no data found")
-}
-
-func CreateNewDBRepository(db *postgres.DatabaseSource) DatabaseRepository {
-	return DatabaseRepository{DB: db}
-}
-
-func (r DatabaseRepository) GetAllOrders(ctx context.Context) ([]entity.Order, error) {
-	query := `SELECT
+var (
+	GetAllOrdersQuery = `SELECT
   o.*,
   (
     SELECT json_build_object(
@@ -103,8 +68,45 @@ func (r DatabaseRepository) GetAllOrders(ctx context.Context) ([]entity.Order, e
   ) AS items
 FROM orders o;
 `
+)
 
-	rows, err := r.DB.Pool.Query(ctx, query)
+type CRUDRepository interface {
+	GetAllOrders(ctx context.Context) ([]entity.Order, error)
+	AddOrder(ctx context.Context, order entity.Order) error
+}
+
+type DatabaseRepository struct {
+	DB *postgres.DatabaseSource
+}
+
+func unmarshalling(src []byte, order *entity.Order, str, label string) error {
+	if len(src) > 0 {
+		var err error
+		switch label {
+		case "D":
+			err = json.Unmarshal(src, &order.Delivery)
+		case "P":
+			err = json.Unmarshal(src, &order.Payment)
+		case "I":
+			err = json.Unmarshal(src, &order.Items)
+		default:
+			return fmt.Errorf("unknown unmarshal target")
+		}
+
+		if err != nil {
+			return fmt.Errorf("%s : %v", str, err)
+		}
+		return nil
+	}
+	return errors.New("no data found")
+}
+
+func CreateNewDBRepository(db *postgres.DatabaseSource) DatabaseRepository {
+	return DatabaseRepository{DB: db}
+}
+
+func (r DatabaseRepository) GetAllOrders(ctx context.Context) ([]entity.Order, error) {
+	rows, err := r.DB.Pool.Query(ctx, GetAllOrdersQuery)
 	if err != nil {
 		return nil, fmt.Errorf("error querying orders: %w", err)
 	}
@@ -152,51 +154,6 @@ FROM orders o;
 	}
 
 	return orders, nil
-	/*rows, err := r.DB.Pool.Query(context.Background(), query)
-	if err != nil {
-		return nil, fmt.Errorf("incorrect getting all order")
-	}
-	defer rows.Close()
-
-	var orders []entity.Order
-
-	for rows.Next() {
-		var o entity.Order
-		var deliveryJSON, paymentJSON, itemsJSON []byte
-
-		err = rows.Scan(
-			&o.OrderUID,
-			&o.TrackNumber,
-			&o.Entry,
-			&o.Locale,
-			&o.InternalSignature,
-			&o.CustomerID,
-			&o.DeliveryService,
-			&o.ShardKey,
-			&o.SmID,
-			&o.DataCreated,
-			&o.OofShard,
-			&deliveryJSON,
-			&paymentJSON,
-			&itemsJSON,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("scan error, something wrong")
-		}
-
-		sliceBytes := [][]byte{deliveryJSON, paymentJSON, itemsJSON}
-		phrases := []string{"delivery parse error", "payment parse error", "items parse error"}
-		labels := []string{DeliveryLabel, PaymentLabel, ItemLabel}
-		for i := 0; i < 3; i++ {
-			if err = unmarshalling(sliceBytes[i], &o, phrases[i], labels[i]); err != nil {
-				return nil, err
-			}
-		}
-
-		orders = append(orders, o)
-	}
-
-	return orders, nil*/
 }
 
 func (r DatabaseRepository) AddOrder(ctx context.Context, order entity.Order) error {

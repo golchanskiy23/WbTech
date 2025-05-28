@@ -1,6 +1,6 @@
 app:
   Name : "WBTech0"
-  Version : "1.0.0"
+  AppVersion : "1.0.0"
   
 database:
   Name : "wbtechdb"

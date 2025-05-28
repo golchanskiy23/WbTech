@@ -13,6 +13,7 @@ import (
 	"Level0/pkg/server"
 	"context"
 	"fmt"
+	"github.com/go-chi/chi/v5"
 	_ "github.com/lib/pq"
 	"github.com/nats-io/nats.go"
 	"log"
@@ -24,6 +25,7 @@ const (
 	SQLInitFile = "init.sql"
 	Channel     = "orders.getter"
 	QueueGroup  = "orders_group"
+	Stream      = "ORDER_STREAM"
 )
 
 func InitDB(db *postgres.DatabaseSource, path string) error {
@@ -43,24 +45,6 @@ func InitDB(db *postgres.DatabaseSource, path string) error {
 		return fmt.Errorf("error adding orders to database: %v", err)
 	}
 	return nil
-}
-
-func CheckIsDBEmpty(db database.DatabaseRepository, ctx context.Context) bool {
-	var count int
-	err := db.DB.Pool.QueryRow(ctx, `
-	SELECT COUNT(*) 
-	FROM information_schema.tables 
-	WHERE table_schema = 'public'
-`).Scan(&count)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if count == 0 {
-		return false
-	}
-	return true
 }
 
 type JetsResponse struct {
@@ -94,11 +78,88 @@ func InitJetStream(cfg *config.Config) JetsResponse {
 	return JetsResponse{Conn: nc, Js: js, Err: nil}
 }
 
-func RunApp(cfg *config.Config) {
-	db, err := postgres.NewStorage(postgres.GetConnection(&cfg.Database), postgres.SetMaxPoolSize(cfg.Database.MaxPoolSize))
-	fmt.Println(postgres.GetConnection(&cfg.Database))
+func initPostgres(cfg *config.Config) (*postgres.DatabaseSource, error) {
+	db, err := postgres.NewStorage(
+		postgres.GetConnection(&cfg.Database),
+		postgres.SetMaxPoolSize(cfg.Database.MaxPoolSize),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init postgres: %w", err)
+	}
 	if err = db.Pool.Ping(context.Background()); err != nil {
-		log.Fatalf("Error during creation database source: %v", err)
+		return nil, fmt.Errorf("ping error: %w", err)
+	}
+	return db, nil
+}
+
+func initDBRepository(db *postgres.DatabaseSource) database.DatabaseRepository {
+	pgRepository := database.CreateNewDBRepository(db)
+	return pgRepository
+}
+
+func initCache(pgRepository database.DatabaseRepository) (*cache.CacheRepository, error) {
+	orders, err := pgRepository.GetAllOrders(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all orders: %w", err)
+	}
+	if len(orders) == 0 {
+		if err = InitDB(pgRepository.DB, SQLInitFile); err != nil {
+			return nil, err
+		}
+	}
+	cacheRepository, err := cache.CreateNewCacheRepository(pgRepository)
+	if err != nil {
+		return nil, err
+	}
+	if cacheRepository.IsEmpty() {
+		if err = InitDB(pgRepository.DB, SQLInitFile); err != nil {
+			return nil, err
+		}
+	}
+	return cacheRepository, nil
+}
+
+func runPublisherAsync(resp JetsResponse) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	ch := make(chan error, 1)
+	go func() {
+		ch <- ExecutePublisher(resp.Js, resp.Conn)
+		close(ch)
+	}()
+
+	select {
+	case err := <-ch:
+		if err != nil {
+			log.Printf("Publisher error: %v", err)
+		}
+	case <-ctx.Done():
+		go func() {
+			if err := <-ch; err != nil {
+				log.Printf("Delayed publisher error: %v", err)
+			}
+		}()
+	}
+}
+
+func startServer(cfg *config.Config, controller *chi.Mux) {
+	customServer := server.NewServer(controller,
+		server.SetReadTimeout(6*time.Second),
+		server.SetWriteTimeout(6*time.Second),
+		server.SetAddr(),
+		server.SetShutdownTimeout(cfg.Server.ShutdownTimeout),
+	)
+	if err := customServer.GracefulShutdown(); err != nil {
+		log.Printf("Server shutdown error: %v", err)
+	}
+}
+
+func RunApp(cfg *config.Config) {
+	db, err := initPostgres(cfg)
+	if err != nil {
+		log.Println(err)
+		return
 	}
 	defer func(db *postgres.DatabaseSource) {
 		db.Close()
@@ -106,77 +167,42 @@ func RunApp(cfg *config.Config) {
 
 	response := InitJetStream(cfg)
 	if response.Err != nil {
-		log.Fatal(response.Err)
+		log.Println(response.Err)
+		return
 	}
-	fmt.Println(response)
 	natsSrc, err := internal_nats.NewNatsSource(response.Conn, response.Js)
 	if err != nil {
-		log.Fatalf("Nats source error: %v", err)
+		log.Printf("Nats source error: %v", err)
+		return
 	}
 
-	defer natsSrc.Close()
+	defer func() {
+		if err = natsSrc.Close(); err != nil {
+			log.Printf("Nats source close error: %v\n", err)
+		}
+	}()
 
-	pgRepository := database.CreateNewDBRepository(db)
+	pgRepository := initDBRepository(db)
+	cacheRepository, err := initCache(pgRepository)
+	if err != nil {
+		log.Printf("Error during creation of repository: %v\n", err)
+		return
+	}
 	natsRepository := natsstreaming.NewNatsJetStreamRepository(natsSrc)
-	// для docker
-	orders, err := pgRepository.GetAllOrders(context.Background())
-	if err != nil {
-		log.Fatalf("Error during cache initialization: %v", err)
-	} else if len(orders) == 0 {
-		if err = InitDB(db, SQLInitFile); err != nil {
-			log.Fatal(err)
-			return
-		}
-	}
-
-	cacheRepository, err := cache.CreateNewCacheRepository(pgRepository)
-	if err != nil {
-		log.Fatalf("Error during creation of repository: %v", err)
-	}
-
-	if cacheRepository.IsEmpty() {
-		if err = InitDB(db, SQLInitFile); err != nil {
-			log.Fatal(err)
-			return
-		}
-	}
 
 	natsService := service.CreateNewNatsService(pgRepository, *natsRepository, cacheRepository)
 	subscription, err := natsService.StartSubscribing(Channel, QueueGroup)
-	defer subscription.Unsubscribe()
+	defer func() {
+		if err = subscription.Unsubscribe(); err != nil {
+			log.Printf("Error unsubscribing: %v\n", err)
+		}
+	}()
 	if err != nil {
-		log.Fatalf("Failed to start nats service: %v", err)
+		log.Printf("Failed to start nats service: %v", err)
 	}
 
 	orderService := service.CreateNewOrderService(cacheRepository)
 	orderController := controller.CreateNewOrderController(orderService)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	publisherChannel := make(chan error, 1)
-	go func(j nats.JetStreamContext, c *nats.Conn) {
-		publisherChannel <- ExecutePublisher(j, c)
-		close(publisherChannel)
-	}(response.Js, response.Conn)
-
-	select {
-	case err = <-publisherChannel:
-		if err != nil {
-			log.Fatalf("Failed to execute publisher: %v", err)
-		}
-	case <-ctx.Done():
-		go func() {
-			if err = <-publisherChannel; err != nil {
-				log.Fatalf("End of service work: %v", err)
-			}
-		}()
-	}
-
-	server := server.NewServer(orderController,
-		server.SetReadTimeout(6*time.Second),
-		server.SetWriteTimeout(6*time.Second),
-		server.SetAddr(),
-		server.SetShutdownTimeout(cfg.Server.ShutdownTimeout))
-	server.GracefulShutdown()
+	runPublisherAsync(response)
+	startServer(cfg, orderController)
 }

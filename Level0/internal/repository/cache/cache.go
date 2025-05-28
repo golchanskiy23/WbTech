@@ -16,7 +16,7 @@ type CacheRepository struct {
 }
 
 func (repo CacheRepository) IsEmpty() bool {
-	return repo.Cache == nil || len(repo.Cache) == 0
+	return repo.Cache == nil
 }
 
 func CreateNewCacheRepository(pg DBRepo.CRUDRepository) (*CacheRepository, error) {
@@ -24,15 +24,14 @@ func CreateNewCacheRepository(pg DBRepo.CRUDRepository) (*CacheRepository, error
 		Mtx:   &sync.RWMutex{},
 		Cache: make(map[string]*entity.Order),
 	}
-	// пока только локально
 	orders, err := pg.GetAllOrders(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("error getting all orders: %v", err)
 	}
 	log.Printf("Got %d orders from DB", len(orders))
 	for _, order := range orders {
-		//fmt.Print(order, " ")
-		//fmt.Println()
+		// fmt.Print(order, " ")
+		// fmt.Println()
 		cacheRepository.Set(&order)
 	}
 	return cacheRepository, nil

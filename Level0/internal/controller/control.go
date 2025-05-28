@@ -18,7 +18,9 @@ func (c Controller) GetOrderByIdHandler(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		resp := fmt.Sprintf("Don't have order with such ID in database: %v", err)
-		w.Write([]byte(resp))
+		if _, err = w.Write([]byte(resp)); err != nil {
+			http.Error(w, "error writing response", http.StatusInternalServerError)
+		}
 		return
 	} else {
 		w.Header().Set("Content-Type", "application/json")
@@ -27,12 +29,16 @@ func (c Controller) GetOrderByIdHandler(w http.ResponseWriter, r *http.Request) 
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			resp := fmt.Sprintf("Error during write response in database: %v", err)
-			w.Write([]byte(resp))
+			if _, err = w.Write([]byte(resp)); err != nil {
+				http.Error(w, "error writing response", http.StatusInternalServerError)
+			}
 			return
 		} else {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			w.Write(ans)
+			if _, err = w.Write(ans); err != nil {
+				http.Error(w, "error writing response", http.StatusInternalServerError)
+			}
 		}
 	}
 }

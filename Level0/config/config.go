@@ -15,7 +15,7 @@ type Config struct {
 
 type App struct {
 	Name    string `mapstructure:"name"`
-	Version string `mapstructure:"version"`
+	Version string `mapstructure:"appversion"`
 }
 
 type HttpServer struct {
@@ -30,8 +30,6 @@ type DB struct {
 	SSLMode     Mode   `mapstructure:"SSLMode"`
 	Schema      string `mapstructure:"schema"`
 	MaxPoolSize int    `mapstructure:"MaxPoolSize"`
-	user        string `mapstructure:"user"`
-	password    string `mapstructure:"password"`
 }
 
 type Mode string

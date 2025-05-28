@@ -5,7 +5,7 @@ services:
     #  dockerfile: Dockerfile
 #    user: appuser
     #image:
-    #  "${DOCKER_USERNAME}/${DEVELOPMENT_STAGE}/demo-platform-handling:${VERSION}"
+    #  "${DOCKER_USERNAME}/${DEVELOPMENT_STAGE}/demo-platform-handling:${APPVERSION}"
 #    env_file:
 #      - .env.container
 #    ports:

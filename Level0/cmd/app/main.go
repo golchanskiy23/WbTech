@@ -39,5 +39,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error loading config: %v", err)
 	}
-	app.RunApp(cfg)
+	if err = app.RunApp(cfg); err != nil {
+		log.Fatalf("Error running app: %v", err)
+	}
 }

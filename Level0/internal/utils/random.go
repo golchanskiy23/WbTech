@@ -2,24 +2,30 @@ package utils
 
 import (
 	"Level0/internal/entity"
+	"log"
 	"math/rand"
 	"strconv"
 	"time"
 )
 
-func RandomOrder() entity.Order {
+type Checker = map[string]struct{}
+
+func RandomOrder(c Checker) entity.Order {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	orderUID := randString(r, c, "order_", 8, true)
+	log.Print(orderUID, " ")
+	trackNumber := randString(r, c, "track_", 6, false)
 
 	return entity.Order{
-		OrderUID:          randString(r, "order_", 8),
-		TrackNumber:       randString(r, "track_", 6),
+		OrderUID:          orderUID,
+		TrackNumber:       trackNumber,
 		Entry:             randomEntry(r),
-		Delivery:          randomDelivery(r),
-		Payment:           randomPayment(r),
-		Items:             randomItems(r, r.Intn(3)+1),
+		Delivery:          randomDelivery(r, c),
+		Payment:           randomPayment(r, orderUID, c),
+		Items:             randomItems(r, r.Intn(3)+1, trackNumber, c),
 		Locale:            "en",
-		InternalSignature: randString(r, "", 10),
-		CustomerID:        randString(r, "cust_", 5),
+		InternalSignature: randString(r, c, "", 10, false),
+		CustomerID:        randString(r, c, "cust_", 5, false),
 		DeliveryService:   randomDeliveryService(r),
 		ShardKey:          strconv.Itoa(r.Intn(100)),
 		SmID:              r.Intn(1000),
@@ -28,13 +34,18 @@ func RandomOrder() entity.Order {
 	}
 }
 
-func randString(r *rand.Rand, prefix string, n int) string {
+func randString(r *rand.Rand, c Checker, prefix string, n int, flag bool) string {
 	chars := "abcdefghijklmnopqrstuvwxyz0123456789"
 	res := make([]byte, n)
 	for i := range res {
 		res[i] = chars[r.Intn(len(chars))]
 	}
-	return prefix + string(res)
+	curr := prefix + string(res)
+	if _, ok := c[curr]; ok && flag {
+		return randString(r, c, prefix, n, flag)
+	}
+	c[curr] = struct{}{}
+	return curr
 }
 
 func randomEntry(r *rand.Rand) string {
@@ -47,22 +58,22 @@ func randomDeliveryService(r *rand.Rand) string {
 	return services[r.Intn(len(services))]
 }
 
-func randomDelivery(r *rand.Rand) entity.Delivery {
+func randomDelivery(r *rand.Rand, c Checker) entity.Delivery {
 	return entity.Delivery{
 		Name:    "John Doe",
 		Phone:   "+79001234567",
 		Zip:     strconv.Itoa(100000 + r.Intn(899999)),
-		City:    "City" + randString(r, "", 3),
+		City:    "City" + randString(r, c, "", 3, false),
 		Address: "Street " + strconv.Itoa(r.Intn(100)),
 		Region:  "Region " + strconv.Itoa(r.Intn(10)),
-		Email:   randString(r, "user", 4) + "@example.com",
+		Email:   randString(r, c, "user", 4, false) + "@example.com",
 	}
 }
 
-func randomPayment(r *rand.Rand) entity.Payment {
+func randomPayment(r *rand.Rand, orderUID string, c Checker) entity.Payment {
 	return entity.Payment{
-		Transaction:  randString(r, "tx_", 12),
-		RequestID:    randString(r, "req_", 6),
+		Transaction:  orderUID,
+		RequestID:    randString(r, c, "req_", 6, false),
 		Currency:     "USD",
 		Provider:     "visa",
 		Amount:       int32(1000 + r.Intn(9000)),
@@ -74,14 +85,15 @@ func randomPayment(r *rand.Rand) entity.Payment {
 	}
 }
 
-func randomItems(r *rand.Rand, n int) []entity.Items {
+func randomItems(r *rand.Rand, n int, t string, c Checker) []entity.Items {
 	items := make([]entity.Items, n)
+	log.Println(n)
 	for i := 0; i < n; i++ {
 		items[i] = entity.Items{
 			ChrtID:      r.Int63(),
-			TrackNumber: randString(r, "track_", 6),
+			TrackNumber: t,
 			Price:       int32(100 + r.Intn(1000)),
-			Rid:         randString(r, "rid_", 6),
+			Rid:         randString(r, c, "rid_", 6, false),
 			Name:        "Item " + strconv.Itoa(i+1),
 			Sale:        int32(r.Intn(100)),
 			Size:        []string{"S", "M", "L", "XL"}[r.Intn(4)],

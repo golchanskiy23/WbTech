@@ -18,7 +18,7 @@ func getConnection(host, port string) string {
 	return fmt.Sprintf("nats://%s:%s", host, port)
 }
 
-func ExecutePublisher(js nats.JetStreamContext, conn *nats.Conn) error {
+func ExecutePublisher(js nats.JetStreamContext, conn *nats.Conn, checker utils.Checker) error {
 	defer conn.Close()
 	lastOrder, err := utils.GetGivenOrder()
 	if err != nil {
@@ -36,7 +36,7 @@ func ExecutePublisher(js nats.JetStreamContext, conn *nats.Conn) error {
 			return fmt.Errorf("can't publish order: %v", err)
 		}
 
-		lastOrder = utils.RandomOrder()
+		lastOrder = utils.RandomOrder(checker)
 		jitter := func(min, max time.Duration) time.Duration {
 			if min >= max {
 				return min

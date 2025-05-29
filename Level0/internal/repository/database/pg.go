@@ -45,7 +45,7 @@ var (
       'custom_fee', p.custom_fee
     )
     FROM payments p
-    WHERE p.order_uid = o.order_uid
+    WHERE p.transaction = o.order_uid
   ) AS payment,
   (
     SELECT json_agg(
@@ -64,7 +64,7 @@ var (
       )
     )
     FROM items i
-    WHERE i.order_uid = o.order_uid
+    WHERE i.track_number = o.track_number
   ) AS items
 FROM orders o;
 `
@@ -152,7 +152,6 @@ func (r DatabaseRepository) GetAllOrders(ctx context.Context) ([]entity.Order, e
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
-
 	return orders, nil
 }
 

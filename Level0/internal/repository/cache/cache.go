@@ -2,10 +2,7 @@ package cache
 
 import (
 	"Level0/internal/entity"
-	DBRepo "Level0/internal/repository/database"
-	"context"
 	"errors"
-	"fmt"
 	"log"
 	"sync"
 )
@@ -19,14 +16,10 @@ func (repo CacheRepository) IsEmpty() bool {
 	return repo.Cache == nil
 }
 
-func CreateNewCacheRepository(pg DBRepo.CRUDRepository) (*CacheRepository, error) {
+func CreateNewCacheRepository(orders []entity.Order) (*CacheRepository, error) {
 	cacheRepository := &CacheRepository{
 		Mtx:   &sync.RWMutex{},
 		Cache: make(map[string]*entity.Order),
-	}
-	orders, err := pg.GetAllOrders(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("error getting all orders: %v", err)
 	}
 	log.Printf("Got %d orders from DB", len(orders))
 	for _, order := range orders {

@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"log"
+	"math"
+	"math/big"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -599,6 +602,183 @@ func task20() string {
 	return strings.Join(runeArr, " ")
 }
 
-func main() {
+type Round interface {
+	getRadius() float64
+}
 
+// round interface
+type SquarePeg struct {
+	Width float64
+}
+
+// round interface
+
+type RoundHole struct {
+	Radius float64
+}
+
+// round interface
+
+type RoundPeg struct {
+	radius float64
+}
+
+func (p RoundPeg) getRadius() float64 {
+	return p.radius
+}
+
+type SquarePegAdapter struct {
+	squarePeg SquarePeg
+}
+
+func (p SquarePegAdapter) getRadius() float64 {
+	return p.squarePeg.Width * math.Sqrt(2) / 2
+}
+
+func (r RoundHole) fits(peg Round) error {
+	if r.Radius < peg.getRadius() {
+		return errors.New("too small roundhole")
+	}
+	return nil
+}
+
+func task21(width, radius float64) error {
+	roundHole := RoundHole{Radius: radius}
+	squarePeg := SquarePeg{Width: width}
+	peg := SquarePegAdapter{squarePeg}
+	if err := roundHole.fits(peg); err != nil {
+		return fmt.Errorf("error during pushing: %v", err)
+	}
+	log.Print("Connected!!!")
+	return nil
+}
+
+type Sign string
+
+const (
+	SUBTRACTION    Sign = "-"
+	ADDITION       Sign = "+"
+	MULTIPLICATION Sign = "*"
+	DIVISION       Sign = "/"
+)
+
+func task22() (*big.Int, error) {
+	var sign Sign
+	first, second, result := new(big.Int), new(big.Int), new(big.Int)
+	scanner := bufio.NewReader(os.Stdin)
+	str, err := scanner.ReadString('\n')
+	if err != nil {
+		return nil, err
+	}
+	arr := strings.Split(str, " ")
+	first.SetString(arr[0], 10)
+	second.SetString(arr[2], 10)
+	sign = Sign(arr[1])
+	fmt.Scanf("%s %v %s", &first, &sign, &second)
+	switch sign {
+	case SUBTRACTION:
+		result = result.Sub(first, second)
+	case ADDITION:
+		result = result.Add(first, second)
+	case MULTIPLICATION:
+		result = result.Mul(first, second)
+	case DIVISION:
+		result = result.Div(first, second)
+	default:
+		return nil, errors.New("unknown sign")
+	}
+	return result, nil
+}
+
+func task23(arr []int, pos int) error {
+	if len(arr) == 0 || pos < 0 || pos >= len(arr) {
+		return errors.New("wrong initialization parameters")
+	}
+	if pos == 0 {
+		arr = arr[1:]
+		return nil
+	}
+	if pos == len(arr)-1 {
+		arr = arr[:pos]
+		return nil
+	}
+	leftHalf, rightHalf := arr[:pos], arr[pos+1:]
+	leftHalf = append(leftHalf, rightHalf...)
+	arr = leftHalf
+	return nil
+}
+
+type Point struct {
+	x, y float64
+}
+
+func PointConstructor(x, y float64) Point {
+	return Point{
+		x, y,
+	}
+}
+
+func (p Point) getX() float64 {
+	return p.x
+}
+
+func (p Point) getY() float64 {
+	return p.y
+}
+
+func getLength(p1, p2 Point) float64 {
+	currX := p1.getX() - p2.getX()
+	currY := p1.getY() - p2.getY()
+	return math.Sqrt(currX*currX + currY*currY)
+}
+
+func sleep(n int, wg *sync.WaitGroup) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(n)*time.Second)
+	defer cancel()
+	select {
+	case <-ctx.Done():
+	}
+	wg.Done()
+}
+
+func task25() {
+	var n int
+	fmt.Scanf("%d\n", &n)
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go sleep(n, &wg)
+	wg.Wait()
+	fmt.Printf("Sleep function completed for %d seconds", n)
+}
+
+func task26() []bool {
+	scanner := bufio.NewScanner(os.Stdin)
+	var ans []bool
+	for scanner.Scan() {
+		curr := scanner.Text()
+		if len(curr) == 0 {
+			break
+		}
+		curr = strings.ToLower(strings.TrimSpace(curr))
+		runeStr := []rune(curr)
+		m := make(map[rune]struct{})
+		flag := true
+		for _, v := range runeStr {
+			if _, ok := m[v]; ok {
+				flag = false
+				break
+			}
+			m[v] = struct{}{}
+		}
+		ans = append(ans, flag)
+	}
+	return ans
+}
+
+func main() {
+	var w, r float64
+	fmt.Scanf("%f %f\n", &w, &r)
+	if err := task21(w, r); err != nil {
+		log.Fatal(err)
+	}
 }

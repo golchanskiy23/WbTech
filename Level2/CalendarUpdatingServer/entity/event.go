@@ -1,7 +1,6 @@
-package main
+package entity
 
 import (
-	"sync"
 	"time"
 )
 
@@ -18,10 +17,4 @@ type Event struct {
 	Description string    `json:"description"`
 	Start       time.Time `json:"start"`
 	End         time.Time `json:"end"`
-}
-
-type EventsCache struct {
-	sync.RWMutex
-	events map[int]Event
-	nextID int
 }

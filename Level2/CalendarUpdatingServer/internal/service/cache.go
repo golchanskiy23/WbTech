@@ -8,13 +8,22 @@ import (
 	"time"
 )
 
+type CacheInterface interface {
+	CreateEvent(title, description string, start, end time.Time) (entity.Event, error)
+	UpdateEvent(eventID int, updatedEvent entity.Event) error
+	DeleteEvent(eventID int) error
+	GetEventsForDay(day time.Time) []entity.Event
+	GetEventsForWeek(startOfWeek time.Time) []entity.Event
+	GetEventsForMonth(year int, month time.Month) []entity.Event
+}
+
 type EventsCache struct {
 	sync.RWMutex
 	Events map[int]entity.Event
 	NextID int
 }
 
-var Cache = CreateNewCache()
+var Cache CacheInterface = CreateNewCache()
 
 func CreateNewCache() *EventsCache {
 	return &EventsCache{

@@ -12,8 +12,8 @@ type Ps struct {
 	handler Handler
 }
 
-func (ps *Ps) Execute(params []string, handler Handler, fs *flag.FlagSet) (string, error) {
-	return "", nil
+func (ps *Ps) Execute(params []string, handler Handler, fs *flag.FlagSet) ([]string, error) {
+	return handler.Handle(params, fs)
 }
 
 type PsWithoutFlags struct {
@@ -24,10 +24,10 @@ func (ps *PsWithoutFlags) setNext(handler Handler) {
 	ps.NextHandler = handler
 }
 
-func (ps *PsWithoutFlags) Handle([]string, *flag.FlagSet) (string, error) {
+func (ps *PsWithoutFlags) Handle([]string, *flag.FlagSet) ([]string, error) {
 	files, err := os.ReadDir("/proc")
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	var processes []string
@@ -49,7 +49,7 @@ func (ps *PsWithoutFlags) Handle([]string, *flag.FlagSet) (string, error) {
 			processes = append(processes, fmt.Sprintf("%5d %s", pid, name))
 		}
 	}
-	return strings.Join(processes, ","), nil
+	return processes, nil
 }
 
 func (ps *PsWithoutFlags) Next() Handler {

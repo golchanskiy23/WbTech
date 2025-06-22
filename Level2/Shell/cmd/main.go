@@ -40,34 +40,45 @@ func main() {
 		fmt.Printf("%s> ", currDir)
 		words, _ := scanner.ReadString('\n')
 		words = strings.TrimSpace(words)
-		input := strings.Split(words, " ")
+		input := strings.Split(words, "|")
 
 		if len(input) == 0 || input[0] == "" {
 			continue
 		} else {
-			if input[0] == "quit" {
-				fmt.Println("Bye. Terminal is closing...")
-				break
-			}
-			meta, ok := shell.Registry[input[0]]
-			if !ok {
-				fmt.Println("No  such command. Try again")
-			} else {
-				f := flag.NewFlagSet(input[0], flag.ContinueOnError)
-				meta.Flags(f)
-
-				if err := f.Parse(input[1:]); err != nil {
-					fmt.Println("Error during parsing flagSet")
+			arr, flag_ := shell.CheckPipeline(input)
+			if flag_ && strings.Contains(words, "|") {
+				ans, err := shell.ExecutePipeline(arr)
+				if err != nil {
+					fmt.Printf("%s\n", err)
 					continue
 				}
-
-				shell.SetCommand(input[0])
-				handlerChain := meta.Chain()
-
-				if val, err := shell.CurrentCommand.Execute(f.Args(), handlerChain, f); err != nil {
-					fmt.Printf("Error during execution command: %v\n", err)
+				fmt.Printf("%s", strings.Join(ans, " "))
+			} else {
+				input = strings.Split(words, " ")
+				if input[0] == "quit" {
+					fmt.Println("Bye. Terminal is closing...")
+					break
+				}
+				meta, ok := shell.Registry[input[0]]
+				if !ok {
+					fmt.Println("No  such command. Try again")
 				} else {
-					fmt.Printf("%s", val)
+					f := flag.NewFlagSet(input[0], flag.ContinueOnError)
+					meta.Flags(f)
+
+					if err := f.Parse(input[1:]); err != nil {
+						fmt.Println("Error during parsing flagSet")
+						continue
+					}
+
+					shell.SetCommand(input[0])
+					handlerChain := meta.Chain()
+
+					if val, err := shell.CurrentCommand.Execute(f.Args(), handlerChain, f); err != nil {
+						fmt.Printf("Error during execution command: %v\n", err)
+					} else {
+						fmt.Printf("%s", strings.Join(val, " "))
+					}
 				}
 			}
 		}

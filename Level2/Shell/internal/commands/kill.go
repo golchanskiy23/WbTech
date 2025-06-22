@@ -14,17 +14,17 @@ type Kill struct {
 	handler Handler
 }
 
-func (k *Kill) Execute(params []string, handler Handler, fs *flag.FlagSet) (string, error) {
+func (k *Kill) Execute(params []string, handler Handler, fs *flag.FlagSet) ([]string, error) {
 	tmpData := params
 	for handler != nil {
 		if val, err := handler.Handle(tmpData, fs); err == nil {
-			tmpData = []string{val}
+			tmpData = val
 			handler = handler.Next()
 		} else {
-			return "", err
+			return nil, err
 		}
 	}
-	return strings.Join(tmpData, " "), nil
+	return tmpData, nil
 }
 
 type ParsePID struct {
@@ -39,14 +39,14 @@ func (ps *ParsePID) setNext(handler Handler) {
 	ps.NextHandler = handler
 }
 
-func (ps *ParsePID) Handle(params []string, fs *flag.FlagSet) (string, error) {
+func (ps *ParsePID) Handle(params []string, fs *flag.FlagSet) ([]string, error) {
 	if len(params) == 0 {
-		return "", fmt.Errorf("invalid amount of params: %d", len(params))
+		return nil, fmt.Errorf("invalid amount of params: %d", len(params))
 	}
 	if _, err := strconv.Atoi(params[0]); err != nil {
-		return "", fmt.Errorf("invalid pid: %v", err)
+		return nil, fmt.Errorf("invalid pid: %v", err)
 	}
-	return strings.Join(params, " "), nil
+	return params, nil
 }
 
 func (ps *ParsePID) Next() Handler {
@@ -57,9 +57,9 @@ func (ps *KillProcess) setNext(handler Handler) {
 	ps.NextHandler = handler
 }
 
-func (ps *KillProcess) Handle(params []string, fs *flag.FlagSet) (string, error) {
+func (ps *KillProcess) Handle(params []string, fs *flag.FlagSet) ([]string, error) {
 	if len(params) == 0 {
-		return "", fmt.Errorf("invalid command line arguments: %d\n", len(params))
+		return nil, fmt.Errorf("invalid command line arguments: %d\n", len(params))
 	}
 
 	parts := strings.Fields(params[0])
@@ -75,15 +75,15 @@ func (ps *KillProcess) Handle(params []string, fs *flag.FlagSet) (string, error)
 
 	proc, err := os.FindProcess(pid)
 	if err != nil {
-		return "", fmt.Errorf("kill failed (find process): %v", err)
+		return nil, fmt.Errorf("kill failed (find process): %v", err)
 	}
 
 	if runtime.GOOS == "windows" {
 		if signal != syscall.SIGKILL {
-			return "", fmt.Errorf("on Windows only SIGKILL (9) is supported")
+			return nil, fmt.Errorf("on Windows only SIGKILL (9) is supported")
 		}
 		if err := proc.Kill(); err != nil {
-			return "", fmt.Errorf("kill failed: %v", err)
+			return nil, fmt.Errorf("kill failed: %v", err)
 		}
 	} else {
 		/*if err := syscall.Kill(pid, sig); err != nil {
@@ -91,7 +91,7 @@ func (ps *KillProcess) Handle(params []string, fs *flag.FlagSet) (string, error)
 		}*/
 	}
 
-	return fmt.Sprintf("Process %d killed with signal %d\n", pid, signal), nil
+	return []string{fmt.Sprintf("Process %d killed with signal %d\n", pid, signal)}, nil
 }
 
 func (ps *KillProcess) Next() Handler {

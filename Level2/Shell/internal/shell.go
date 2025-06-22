@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"shell/internal/commands"
 	"strings"
+	"time"
 )
 
 type CmdMeta struct {
@@ -141,11 +142,13 @@ func (s *Shell) InitShell() {
 			},
 			Chain: buildWgetChain,
 		},
-		/*"telnet": {
-			Cmd:   &commands.Telnet{},
-			Flags: func(fs *flag.FlagSet) {},
-			Chain: func() commands.Handler { return &TelnetWithoutFlags{} },
-		},*/
+		"telnet": {
+			Cmd: &commands.Telnet{},
+			Flags: func(fs *flag.FlagSet) {
+				fs.Duration("timeout", 10*time.Second, "timeout for connection closing")
+			},
+			Chain: func() commands.Handler { return &commands.TelnetConnect{} },
+		},
 	}
 }
 
